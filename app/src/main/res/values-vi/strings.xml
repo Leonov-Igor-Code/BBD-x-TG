@@ -258,6 +258,12 @@
     <string name="tg_ws_cf_enabled_summary">Định tuyến qua các tên miền CF WebSocket (ổn định hơn trên một số mạng)</string>
     <string name="tg_ws_pool_size_title">Kích thước pool WS</string>
     <string name="tg_ws_pool_size_summary">Số kết nối WebSocket được chuẩn bị sẵn (nhiều hơn = kết nối lần đầu nhanh hơn)</string>
+    <string name="tg_ws_cf_insecure_title">Cổng 80 cho Cloudflare</string>
+    <string name="tg_ws_cf_insecure_summary">Dùng cổng 80 thay vì 443 — giúp trên mạng di động nơi cổng 443 bị chặn</string>
+    <string name="tg_ws_faketls_title">Tên miền FakeTLS</string>
+    <string name="tg_ws_faketls_summary">Tên miền để ngụy trang MTProto thành TLS (khóa ee). Để trống cho chế độ thường (khóa dd)</string>
+    <string name="tg_ws_cf_worker_domains_title">Tên miền CF Worker tùy chỉnh</string>
+    <string name="tg_ws_cf_worker_domains_summary">Danh sách tên miền Cloudflare Workers phân tách bằng dấu phẩy. Để trống để tự động chọn</string>
     <string name="tg_ws_secret_title">Khóa bí mật MTProto</string>
     <string name="tg_ws_secret_summary">Nhấn để xem và sao chép khóa hex 32 ký tự</string>
     <string name="tg_ws_secret_copied">Đã sao chép khóa bí mật vào bộ nhớ tạm</string>
