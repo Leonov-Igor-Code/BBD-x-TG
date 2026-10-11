@@ -257,6 +257,12 @@
     <string name="tg_ws_cf_enabled_summary">CF WebSocket-домендері арқылы бағыттау (кейбір желілерде тұрақтырақ)</string>
     <string name="tg_ws_pool_size_title">WS pool өлшемі</string>
     <string name="tg_ws_pool_size_summary">Алдын ала дайындалған WebSocket-қосылымдар саны (көбірек = алғашқы қосылу жылдырақ)</string>
+    <string name="tg_ws_cf_insecure_title">Cloudflare үшін 80-порт</string>
+    <string name="tg_ws_cf_insecure_summary">443 орнына 80-портты пайдалану — 443 блокталған мобильді желілерде көмектеседі</string>
+    <string name="tg_ws_faketls_title">FakeTLS-домен</string>
+    <string name="tg_ws_faketls_summary">MTProto-ны TLS ретінде маскалауға арналған домен (ee құпиясы). Әдетті режим үшін бос қалдырыңыз (dd құпиясы)</string>
+    <string name="tg_ws_cf_worker_domains_title">Өз CF Worker-домендері</string>
+    <string name="tg_ws_cf_worker_domains_summary">Үтірмен бөлінген Cloudflare Workers домендері. Автоматты таңдау үшін бос қалдырыңыз</string>
     <string name="tg_ws_secret_title">MTProto құпия кілті</string>
     <string name="tg_ws_secret_summary">32 таңбалы hex кілтті көру және көшіру үшін басыңыз</string>
     <string name="tg_ws_secret_copied">Құпия кілт буферге көшірілді</string>

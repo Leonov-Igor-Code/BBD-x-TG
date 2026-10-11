@@ -257,6 +257,12 @@
     <string name="tg_ws_cf_enabled_summary">CF WebSocket alan adları üzerinden yönlendirme (bazı ağlarda daha kararlı)</string>
     <string name="tg_ws_pool_size_title">WS havuz boyutu</string>
     <string name="tg_ws_pool_size_summary">Önceden hazırlanan WebSocket bağlantı sayısı (daha fazla = daha hızlı ilk bağlantı)</string>
+    <string name="tg_ws_cf_insecure_title">Cloudflare için 80 portu</string>
+    <string name="tg_ws_cf_insecure_summary">443 yerine 80 portunu kullan — 443\'ün engellendiği mobil ağlarda yardımcı olur</string>
+    <string name="tg_ws_faketls_title">FakeTLS alan adı</string>
+    <string name="tg_ws_faketls_summary">MTProto\'yu TLS gibi gizlemek için alan adı (ee anahtarı). Normal mod için boş bırakın (dd anahtarı)</string>
+    <string name="tg_ws_cf_worker_domains_title">Özel CF Worker alan adları</string>
+    <string name="tg_ws_cf_worker_domains_summary">Virgülle ayrılmış Cloudflare Workers alan adları. Otomatik seçim için boş bırakın</string>
     <string name="tg_ws_secret_title">MTProto gizli anahtarı</string>
     <string name="tg_ws_secret_summary">32 karakterlik hex anahtarı görüntülemek ve kopyalamak için dokunun</string>
     <string name="tg_ws_secret_copied">Gizli anahtar panoya kopyalandı</string>

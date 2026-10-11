@@ -75,11 +75,10 @@ class MainSettingsFragment : PreferenceFragmentCompat() {
                 val tgWsEnabled = prefs.getBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, false)
 
                 if (tgWsEnabled) {
-                    // MTProto WS Proxy — используем t.me/proxy?...&secret=
+                    // MTProto WS Proxy — используем t.me/proxy?...&secret= (dd или ee при FakeTLS)
                     val port = EwenloyTgWsServiceExtension.TG_WS_PORT
-                    val secretKey = prefs.getString(EwenloyTgWsServiceExtension.EWENLOY_TG_SECRET_KEY, "") ?: ""
-                    val secretForUrl = if (secretKey.isEmpty()) "00000000000000000000000000000000" else secretKey
-                    val proxyUrl = "https://t.me/proxy?server=127.0.0.1&port=$port&secret=dd$secretForUrl"
+                    val secretForUrl = EwenloyTgWsServiceExtension.buildProxySecret(prefs)
+                    val proxyUrl = "https://t.me/proxy?server=127.0.0.1&port=$port&secret=$secretForUrl"
                     applyToTelegramPackages(requireContext(), proxyUrl)
                 } else {
                     // SOCKS5 режим

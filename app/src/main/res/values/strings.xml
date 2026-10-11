@@ -223,6 +223,12 @@
     <string name="tg_ws_cf_enabled_summary">Маршрутизация через CF WebSocket-домены (стабильнее на некоторых сетях)</string>
     <string name="tg_ws_pool_size_title">WS Pool размер</string>
     <string name="tg_ws_pool_size_summary">Количество заранее подготовленных WebSocket-соединений (больше = быстрее первое подключение)</string>
+    <string name="tg_ws_cf_insecure_title">Порт 80 для Cloudflare</string>
+    <string name="tg_ws_cf_insecure_summary">Использовать порт 80 вместо 443 — помогает в мобильных сетях, где 443 заблокирован</string>
+    <string name="tg_ws_faketls_title">FakeTLS-домен</string>
+    <string name="tg_ws_faketls_summary">Домен для маскировки MTProto под TLS (секрет ee). Оставьте пустым для обычного режима (секрет dd)</string>
+    <string name="tg_ws_cf_worker_domains_title">Свои CF Worker-домены</string>
+    <string name="tg_ws_cf_worker_domains_summary">Список доменов Cloudflare Workers через запятую. Пусто — автоматический выбор</string>
     <string name="tg_ws_secret_title">Секрет MTProto</string>
     <string name="tg_ws_secret_summary">Нажмите для просмотра и копирования 32-char hex ключа</string>
     <string name="tg_ws_secret_copied">Секрет скопирован в буфер</string>

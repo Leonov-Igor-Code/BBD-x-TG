@@ -37,6 +37,10 @@ class EwenloyTgWsServiceExtension {
         val poolSize = preferences.getString(PREF_POOL_SIZE, DEFAULT_POOL_SIZE.toString())?.toIntOrNull() ?: DEFAULT_POOL_SIZE
         val cfEnabled = preferences.getBoolean(PREF_CF_ENABLED, true)
         val cfDomain = if (cfEnabled) (preferences.getString(PREF_CF_DOMAIN, "") ?: "") else ""
+        val cfInsecure = cfEnabled && preferences.getBoolean(PREF_CF_INSECURE, false)
+        val fakeTlsDomain = preferences.getString(PREF_FAKETLS_DOMAIN, "")?.trim() ?: ""
+        val cfWorkerDomains = if (cfEnabled) (preferences.getString(PREF_CF_WORKER_DOMAINS, "")?.trim() ?: "") else ""
+        val bufferKb = preferences.getString(PREF_BUFFER_KB, "0")?.toIntOrNull() ?: 0
         val dcIps = buildDcIps(preferences)
 
         ContextCompat.startForegroundService(ctx,
@@ -50,6 +54,10 @@ class EwenloyTgWsServiceExtension {
                 putExtra(TgWsProxyService.EXTRA_CFPROXY_PRIORITY, true)
                 putExtra(TgWsProxyService.EXTRA_CFPROXY_DOMAIN, cfDomain)
                 putExtra(TgWsProxyService.EXTRA_SECRET_KEY, secret)
+                putExtra(TgWsProxyService.EXTRA_CF_INSECURE, cfInsecure)
+                putExtra(TgWsProxyService.EXTRA_FAKETLS_DOMAIN, fakeTlsDomain)
+                putExtra(TgWsProxyService.EXTRA_CF_WORKER_DOMAINS, cfWorkerDomains)
+                putExtra(TgWsProxyService.EXTRA_BUFFER_KB, bufferKb)
             }
         )
         Log.i(TAG, "TgWsProxyService start requested on port $TG_WS_PORT")
@@ -148,6 +156,11 @@ class EwenloyTgWsServiceExtension {
         const val PREF_POOL_SIZE         = "tg_ws_pool_size"
         const val PREF_CF_ENABLED        = "tg_ws_cf_enabled"
         const val PREF_CF_DOMAIN         = "tg_ws_cf_domain"
+        // Синхронизация с апстримом tg-ws-proxy (2026-10)
+        const val PREF_CF_INSECURE       = "tg_ws_cf_insecure"
+        const val PREF_FAKETLS_DOMAIN    = "tg_ws_faketls_domain"
+        const val PREF_CF_WORKER_DOMAINS = "tg_ws_cf_worker_domains"
+        const val PREF_BUFFER_KB         = "tg_ws_buffer_kb"
         const val PREF_EXPERIMENTAL_MODE = "tg_ws_experimental_mode"
         const val PREF_DC1   = "tg_ws_dc1";  const val PREF_DC2   = "tg_ws_dc2"
         const val PREF_DC3   = "tg_ws_dc3";  const val PREF_DC4   = "tg_ws_dc4"
@@ -162,5 +175,20 @@ class EwenloyTgWsServiceExtension {
         const val TG_STATUS_DIRECT   = "direct"
 
         private const val DEFAULT_POOL_SIZE = 4
+
+        /**
+         * Секрет для ссылки t.me/proxy: dd{secret} в обычном режиме,
+         * ee{secret}{domain_hex} при заданном FakeTLS-домене (как в движке).
+         */
+        fun buildProxySecret(prefs: SharedPreferences): String {
+            val secret = prefs.getString(PREF_SECRET_KEY, "")?.trim() ?: ""
+            val safeSecret = if (secret.length == 32) secret else "00000000000000000000000000000000"
+            val faketls = prefs.getString(PREF_FAKETLS_DOMAIN, "")?.trim() ?: ""
+            return if (faketls.isNotEmpty()) {
+                "ee$safeSecret" + faketls.toByteArray().joinToString("") { "%02x".format(it) }
+            } else {
+                "dd$safeSecret"
+            }
+        }
     }
 }

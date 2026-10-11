@@ -50,6 +50,10 @@ class TgWsProxyService : Service() {
     private var lastCfPriority: Boolean = true
     private var lastCfDomain: String = ""
     private var lastSecretKey: String = ""
+    private var lastCfInsecure: Boolean = false
+    private var lastFakeTlsDomain: String = ""
+    private var lastCfWorkerDomains: String = ""
+    private var lastBufferKb: Int = 0
 
     companion object {
         const val ACTION_START = "io.github.romanvht.byedpi.tgws.START"
@@ -63,6 +67,12 @@ class TgWsProxyService : Service() {
         const val EXTRA_CFPROXY_PRIORITY = "EXTRA_CFPROXY_PRIORITY"
         const val EXTRA_CFPROXY_DOMAIN = "EXTRA_CFPROXY_DOMAIN"
         const val EXTRA_SECRET_KEY = "EXTRA_SECRET_KEY"
+        // Синхронизация с апстримом tg-ws-proxy (2026-10): порт 80 для CF,
+        // FakeTLS-домен, свои CF Worker-домены, размер буфера
+        const val EXTRA_CF_INSECURE = "EXTRA_CF_INSECURE"
+        const val EXTRA_FAKETLS_DOMAIN = "EXTRA_FAKETLS_DOMAIN"
+        const val EXTRA_CF_WORKER_DOMAINS = "EXTRA_CF_WORKER_DOMAINS"
+        const val EXTRA_BUFFER_KB = "EXTRA_BUFFER_KB"
         
         private const val NOTIFICATION_ID = 101
         private const val CHANNEL_ID = "TG_WS_Proxy_Service_v4"
@@ -110,7 +120,14 @@ class TgWsProxyService : Service() {
                 val cfPriority = intent.getBooleanExtra(EXTRA_CFPROXY_PRIORITY, true)
                 val cfDomain = intent.getStringExtra(EXTRA_CFPROXY_DOMAIN) ?: ""
                 val secretKey = intent.getStringExtra(EXTRA_SECRET_KEY) ?: ""
-                startProxy(bindIp, port, ips, poolSize, cfEnabled, cfPriority, cfDomain, secretKey)
+                val cfInsecure = intent.getBooleanExtra(EXTRA_CF_INSECURE, false)
+                val fakeTlsDomain = intent.getStringExtra(EXTRA_FAKETLS_DOMAIN) ?: ""
+                val cfWorkerDomains = intent.getStringExtra(EXTRA_CF_WORKER_DOMAINS) ?: ""
+                val bufferKb = intent.getIntExtra(EXTRA_BUFFER_KB, 0)
+                startProxy(
+                    bindIp, port, ips, poolSize, cfEnabled, cfPriority, cfDomain, secretKey,
+                    cfInsecure, fakeTlsDomain, cfWorkerDomains, bufferKb
+                )
             }
             ACTION_STOP -> {
                 stopProxy()
@@ -123,7 +140,11 @@ class TgWsProxyService : Service() {
                 // If we had saved params, try to restart
                 if (lastPort > 0 && lastSecretKey.isNotEmpty()) {
                     Log.w(TAG, "Service restarted by system, re-starting proxy")
-                    startProxy(lastBindIp, lastPort, lastIps, lastPoolSize, lastCfEnabled, lastCfPriority, lastCfDomain, lastSecretKey)
+                    startProxy(
+                        lastBindIp, lastPort, lastIps, lastPoolSize, lastCfEnabled, lastCfPriority,
+                        lastCfDomain, lastSecretKey, lastCfInsecure, lastFakeTlsDomain,
+                        lastCfWorkerDomains, lastBufferKb
+                    )
                 } else {
                     stopSelf()
                 }
@@ -150,7 +171,9 @@ class TgWsProxyService : Service() {
 
     private fun startProxy(bindIp: String, port: Int, ips: String, poolSize: Int = 4,
                            cfEnabled: Boolean = true, cfPriority: Boolean = true,
-                           cfDomain: String = "", secretKey: String = "") {
+                           cfDomain: String = "", secretKey: String = "",
+                           cfInsecure: Boolean = false, fakeTlsDomain: String = "",
+                           cfWorkerDomains: String = "", bufferKb: Int = 0) {
         if (_isRunning.value || stopInProgress) return
         _isVerifiedRunning.value = false
 
@@ -163,6 +186,10 @@ class TgWsProxyService : Service() {
         lastCfPriority = cfPriority
         lastCfDomain = cfDomain
         lastSecretKey = secretKey
+        lastCfInsecure = cfInsecure
+        lastFakeTlsDomain = fakeTlsDomain
+        lastCfWorkerDomains = cfWorkerDomains
+        lastBufferKb = bufferKb
         notificationStartedAtMs = System.currentTimeMillis()
         lastNotificationContent = getString(R.string.notification_starting)
         lastNotificationAtMs = notificationStartedAtMs
@@ -197,8 +224,12 @@ class TgWsProxyService : Service() {
 
             try {
                 NativeProxy.setPoolSize(poolSize)
+                if (bufferKb > 0) NativeProxy.setBufferSizeKb(bufferKb)
                 NativeProxy.setCfProxyCacheDir(cacheDir.absolutePath)
                 NativeProxy.setCfProxyConfig(cfEnabled, cfPriority, cfDomain)
+                if (cfWorkerDomains.isNotBlank()) NativeProxy.setCfWorkerDomains(cfWorkerDomains)
+                NativeProxy.setFakeTlsDomain(fakeTlsDomain)
+                NativeProxy.setDisableSecure(cfInsecure)
                 val result = NativeProxy.startProxy(bindIp, port, ips, secretKey, 1)
                 if (result == 0) {
                     autoRestartAttempts = 0
@@ -301,7 +332,11 @@ class TgWsProxyService : Service() {
                         cfEnabled = lastCfEnabled,
                         cfPriority = lastCfPriority,
                         cfDomain = lastCfDomain,
-                        secretKey = lastSecretKey
+                        secretKey = lastSecretKey,
+                        cfInsecure = lastCfInsecure,
+                        fakeTlsDomain = lastFakeTlsDomain,
+                        cfWorkerDomains = lastCfWorkerDomains,
+                        bufferKb = lastBufferKb
                     )
                 }
             } else {
@@ -339,7 +374,11 @@ class TgWsProxyService : Service() {
                 cfEnabled = lastCfEnabled,
                 cfPriority = lastCfPriority,
                 cfDomain = lastCfDomain,
-                secretKey = lastSecretKey
+                secretKey = lastSecretKey,
+                cfInsecure = lastCfInsecure,
+                fakeTlsDomain = lastFakeTlsDomain,
+                cfWorkerDomains = lastCfWorkerDomains,
+                bufferKb = lastBufferKb
             )
         }
     }

@@ -257,9 +257,8 @@ class MainActivity : BaseActivity() {
             val tgWsEnabled = prefs.getBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, false)
             if (tgWsEnabled) {
                 val port = EwenloyTgWsServiceExtension.TG_WS_PORT
-                val secretKey = prefs.getString(EwenloyTgWsServiceExtension.PREF_SECRET_KEY, "") ?: ""
-                val secret = if (secretKey.isEmpty()) "00000000000000000000000000000000" else secretKey
-                val url = "https://t.me/proxy?server=127.0.0.1&port=$port&secret=dd$secret"
+                val secret = EwenloyTgWsServiceExtension.buildProxySecret(prefs)
+                val url = "https://t.me/proxy?server=127.0.0.1&port=$port&secret=$secret"
                 applyToTelegramPackages(url)
             } else {
                 val port = prefs.getStringNotNull("byedpi_proxy_port", "1080")

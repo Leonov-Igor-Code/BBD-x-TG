@@ -32,6 +32,28 @@
             android:defaultValue="4"
             android:dependency="ewenloy_tg_ws_mode_enabled" />
 
+        <SwitchPreference
+            android:key="tg_ws_cf_insecure"
+            android:icon="@drawable/ic_http"
+            android:title="@string/tg_ws_cf_insecure_title"
+            android:summary="@string/tg_ws_cf_insecure_summary"
+            android:defaultValue="false"
+            android:dependency="tg_ws_cf_enabled" />
+
+        <EditTextPreference
+            android:key="tg_ws_faketls_domain"
+            android:icon="@drawable/ic_vpn_key"
+            android:title="@string/tg_ws_faketls_title"
+            android:summary="@string/tg_ws_faketls_summary"
+            android:dependency="ewenloy_tg_ws_mode_enabled" />
+
+        <EditTextPreference
+            android:key="tg_ws_cf_worker_domains"
+            android:icon="@drawable/ic_cloud"
+            android:title="@string/tg_ws_cf_worker_domains_title"
+            android:summary="@string/tg_ws_cf_worker_domains_summary"
+            android:dependency="tg_ws_cf_enabled" />
+
         <Preference
             android:key="tg_ws_secret_key"
             android:icon="@drawable/ic_key"
