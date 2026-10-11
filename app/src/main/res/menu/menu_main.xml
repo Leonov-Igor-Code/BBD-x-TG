@@ -5,15 +5,15 @@
     tools:context=".activities.MainActivity">
 
     <item
-        android:id="@+id/action_save_logs"
+        android:id="@+id/action_diagnostics"
         android:orderInCategory="1"
-        android:title="@string/save_logs"
+        android:title="@string/diagnostics"
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_tg_ws_logs"
+        android:id="@+id/action_save_logs"
         android:orderInCategory="2"
-        android:title="@string/tg_ws_logs_title"
+        android:title="@string/save_logs"
         app:showAsAction="never" />
 
     <item

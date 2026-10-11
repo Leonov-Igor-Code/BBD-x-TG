@@ -7,13 +7,16 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Process
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.activities.MainActivity
+import io.github.romanvht.byedpi.data.Mode
 import io.github.romanvht.byedpi.data.PAUSE_ACTION
 import io.github.romanvht.byedpi.data.RESUME_ACTION
 import io.github.romanvht.byedpi.data.STOP_ACTION
+import io.github.romanvht.byedpi.receiver.ServiceActionReceiver
 
 fun registerNotificationChannel(context: Context, id: String, @StringRes name: Int) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -37,32 +40,31 @@ fun createConnectionNotification(
     channelId: String,
     @StringRes title: Int,
     @StringRes content: Int,
-    statusLine: String? = null,
-    service: Class<*>,
-): Notification {
-    val baseText = context.getString(content)
-    val bigText = if (!statusLine.isNullOrBlank()) "$baseText\n$statusLine" else baseText
-    return NotificationCompat.Builder(context, channelId)
+    mode: Mode,
+): Notification =
+    NotificationCompat.Builder(context, channelId)
         .setSmallIcon(R.drawable.ic_notification)
         .setSilent(true)
         .setContentTitle(context.getString(title))
-        .setContentText(baseText)
-        // Развёрнутая шторка показывает и режим, и строку Telegram WS с трафиком
-        .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+        .setContentText(context.getString(content))
         .addAction(0, context.getString(R.string.service_pause_btn),
-            PendingIntent.getService(
+            PendingIntent.getBroadcast(
                 context,
-                0,
-                Intent(context, service).setAction(PAUSE_ACTION),
-                PendingIntent.FLAG_IMMUTABLE,
+                mode.ordinal,
+                Intent(context, ServiceActionReceiver::class.java).setAction(PAUSE_ACTION)
+                    .putExtra(ServiceActionReceiver.EXTRA_MODE, mode.name)
+                    .putExtra(ServiceActionReceiver.EXTRA_PID, Process.myPid()),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         )
         .addAction(0, context.getString(R.string.service_stop_btn),
-            PendingIntent.getService(
+            PendingIntent.getBroadcast(
                 context,
-                0,
-                Intent(context, service).setAction(STOP_ACTION),
-                PendingIntent.FLAG_IMMUTABLE,
+                mode.ordinal,
+                Intent(context, ServiceActionReceiver::class.java).setAction(STOP_ACTION)
+                    .putExtra(ServiceActionReceiver.EXTRA_MODE, mode.name)
+                    .putExtra(ServiceActionReceiver.EXTRA_PID, Process.myPid()),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         )
         .setContentIntent(
@@ -74,14 +76,13 @@ fun createConnectionNotification(
             )
         )
         .build()
-}
 
 fun createPauseNotification(
     context: Context,
     channelId: String,
     @StringRes title: Int,
     @StringRes content: Int,
-    service: Class<*>,
+    mode: Mode,
 ): Notification =
     NotificationCompat.Builder(context, channelId)
         .setSmallIcon(R.drawable.ic_notification)
@@ -89,11 +90,12 @@ fun createPauseNotification(
         .setContentTitle(context.getString(title))
         .setContentText(context.getString(content))
         .addAction(0, context.getString(R.string.service_start_btn),
-            PendingIntent.getService(
+            PendingIntent.getBroadcast(
                 context,
-                0,
-                Intent(context, service).setAction(RESUME_ACTION),
-                PendingIntent.FLAG_IMMUTABLE,
+                mode.ordinal,
+                Intent(context, ServiceActionReceiver::class.java).setAction(RESUME_ACTION)
+                    .putExtra(ServiceActionReceiver.EXTRA_MODE, mode.name),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         )
         .setContentIntent(

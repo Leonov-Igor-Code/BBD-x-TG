@@ -115,6 +115,9 @@ class StrategyResultAdapter(
             val strategy = strategies[position]
 
             if (strategy.totalRequests > 0) {
+                holder.progressLayout.visibility = View.VISIBLE
+                holder.progressTextView.visibility = View.VISIBLE
+
                 val isProgress = isTesting && !strategy.isCompleted
 
                 if (isProgress) {
@@ -145,23 +148,25 @@ class StrategyResultAdapter(
         return strategies.size
     }
 
+    fun updateStrategy(strategy: StrategyResult) {
+        val position = strategies.indexOfFirst { it === strategy }
+        if (position != -1) notifyItemChanged(position, "progress")
+    }
+
     @SuppressLint("NotifyDataSetChanged")
     fun setTestingState(testing: Boolean) {
+        if (isTesting == testing) return
         isTesting = testing
         notifyDataSetChanged()
     }
 
     @SuppressLint("NotifyDataSetChanged")
-    fun updateStrategies(newStrategies: List<StrategyResult>, sortByPercentage: Boolean = true) {
+    fun updateStrategies(newStrategies: List<StrategyResult>) {
         strategies.clear()
 
-        val sorted = if (sortByPercentage) {
-            newStrategies.sortedWith(compareByDescending<StrategyResult> { it.isCompleted }
-                .thenByDescending { it.successPercentage }
-                .thenByDescending { it.successCount })
-        } else {
-            newStrategies
-        }
+        val sorted = newStrategies.sortedWith(compareByDescending<StrategyResult> { it.isCompleted }
+            .thenByDescending { it.successPercentage }
+            .thenByDescending { it.successCount })
 
         strategies.addAll(sorted)
         notifyDataSetChanged()

@@ -1,5 +1,6 @@
 package io.github.romanvht.byedpi.services
 
+import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -7,6 +8,7 @@ import android.service.quicksettings.TileService
 import android.util.Log
 import androidx.annotation.RequiresApi
 import io.github.romanvht.byedpi.data.*
+import io.github.romanvht.byedpi.receiver.ServiceActionReceiver
 import io.github.romanvht.byedpi.utility.getPreferences
 import io.github.romanvht.byedpi.utility.mode
 
@@ -16,8 +18,6 @@ class QuickTileService : TileService() {
     companion object {
         private const val TAG = "QuickTileService"
         private var instance: QuickTileService? = null
-        @Volatile private var lastClickMs = 0L
-        private const val DEBOUNCE_MS = 2000L
 
         fun updateTile() {
             instance?.updateStatus()
@@ -28,27 +28,24 @@ class QuickTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()
+
         instance = this
         appTile = qsTile
+
+        ServiceManager.refresh(this)
         updateStatus()
     }
 
     override fun onStopListening() {
         super.onStopListening()
+
         instance = null
         appTile = null
     }
 
     override fun onClick() {
         super.onClick()
-
-        val now = System.currentTimeMillis()
-        if (now - lastClickMs < DEBOUNCE_MS) {
-            Log.d(TAG, "Tile click debounced")
-            return
-        }
-        lastClickMs = now
-
+        ServiceManager.refresh(this)
         handleClick()
     }
 
@@ -60,27 +57,34 @@ class QuickTileService : TileService() {
             AppStatus.Halted -> startService(mode)
             AppStatus.Running -> stopService()
         }
+
+        Log.i(TAG, "Tile clicked")
     }
 
     private fun startService(mode: Mode) {
         if (mode == Mode.VPN && VpnService.prepare(this) != null) {
             return
         }
-        ServiceManager.start(this, mode)
-        setState(Tile.STATE_ACTIVE)
+
+        sendBroadcast(Intent(this, ServiceActionReceiver::class.java).setAction(START_ACTION)
+            .putExtra(ServiceActionReceiver.EXTRA_MODE, mode.name))
     }
 
     private fun stopService() {
-        ServiceManager.stop(this)
+        sendBroadcast(Intent(this, ServiceActionReceiver::class.java).setAction(STOP_ACTION)
+            .putExtra(ServiceActionReceiver.EXTRA_MODE, appStatus.second.name))
         setState(Tile.STATE_INACTIVE)
     }
 
     private fun updateStatus() {
         val (status) = appStatus
-        setState(when (status) {
+
+        val newState = when (status) {
             AppStatus.Running -> Tile.STATE_ACTIVE
             AppStatus.Halted -> Tile.STATE_INACTIVE
-        })
+        }
+
+        setState(newState)
     }
 
     private fun setState(state: Int) {

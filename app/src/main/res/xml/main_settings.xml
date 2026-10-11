@@ -89,12 +89,22 @@
             android:summary="%s"
             android:defaultValue="vpn" />
 
+        <Preference
+            android:key="dns_ip_picker"
+            android:icon="@drawable/ic_dns"
+            android:title="@string/dbs_ip_setting" />
+
+        <Preference
+            android:key="private_dns"
+            android:icon="@drawable/ic_dns"
+            android:title="@string/private_dns"
+            android:persistent="false"
+            app:isPreferenceVisible="false" />
+
         <EditTextPreference
             android:key="dns_ip"
-            android:icon="@drawable/ic_dns"
             android:title="@string/dbs_ip_setting"
-            android:defaultValue="8.8.8.8"
-            app:useSimpleSummaryProvider="true" />
+            android:defaultValue="1.1.1.1" />
 
         <SwitchPreference
             android:key="ipv6_enable"
@@ -143,7 +153,7 @@
             android:key="byedpi_enable_cmd_settings"
             android:icon="@drawable/ic_terminal"
             android:title="@string/use_command_line_settings"
-            android:defaultValue="false" />
+            android:defaultValue="true" />
 
         <Preference
             android:key="byedpi_ui_settings"
@@ -186,13 +196,6 @@
             android:defaultValue="1080"
             app:useSimpleSummaryProvider="true" />
 
-        <SwitchPreference
-            android:key="byedpi_http_connect"
-            android:icon="@drawable/ic_http"
-            android:title="@string/byedpi_http_connect_setting"
-            android:defaultValue="false"
-            android:summary="@string/byedpi_http_connect_summary"/>
-
     </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
@@ -218,6 +221,11 @@
         android:title="@string/about_category">
 
         <Preference
+            android:key="donate"
+            android:icon="@drawable/ic_favorite"
+            android:title="@string/donate" />
+
+        <Preference
             android:key="telegram_group"
             android:title="@string/telegram_link"
             android:icon="@drawable/ic_telegram">
@@ -241,7 +249,7 @@
             android:title="@string/documentation_link">
             <intent
                 android:action="android.intent.action.VIEW"
-                android:data="https://github.com/BDManual/ByeByeDPI-Manual" />
+                android:data="https://byebyedpi.xyz" />
         </Preference>
 
         <Preference

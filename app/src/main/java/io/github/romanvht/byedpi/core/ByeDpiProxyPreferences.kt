@@ -5,79 +5,39 @@ import android.content.SharedPreferences
 import android.util.Log
 import io.github.romanvht.byedpi.data.UISettings
 import io.github.romanvht.byedpi.utility.DomainListUtils
-import io.github.romanvht.byedpi.utility.checkIpAndPortInCmd
+import io.github.romanvht.byedpi.utility.checkIpAndPortInArgs
+import io.github.romanvht.byedpi.utility.getCmdArgs
+import io.github.romanvht.byedpi.utility.getCmdEnable
 import io.github.romanvht.byedpi.utility.getStringNotNull
 import io.github.romanvht.byedpi.utility.shellSplit
 
 sealed interface ByeDpiProxyPreferences {
     companion object {
-        fun fromSharedPreferences(
-            preferences: SharedPreferences,
-            context: Context,
-            overrideIp: String? = null,
-            overridePort: String? = null,
-            forceOverride: Boolean = false,
-        ): ByeDpiProxyPreferences =
-            when (preferences.getBoolean("byedpi_enable_cmd_settings", false)) {
-                true -> ByeDpiProxyCmdPreferences(preferences, context, overrideIp, overridePort, forceOverride)
-                false -> ByeDpiProxyUIPreferences(preferences, overrideIp, overridePort)
+        fun fromSharedPreferences(preferences: SharedPreferences, context: Context): ByeDpiProxyPreferences =
+            when (preferences.getCmdEnable()) {
+                true -> ByeDpiProxyCmdPreferences(preferences, context)
+                false -> ByeDpiProxyUIPreferences(preferences)
             }
     }
 }
 
 class ByeDpiProxyCmdPreferences(val args: Array<String>) : ByeDpiProxyPreferences {
-    constructor(preferences: SharedPreferences, context: Context) : this(
-        parseCmdToArguments(preferences, context, null, null, false)
-    )
-
-    constructor(
-        preferences: SharedPreferences,
-        context: Context,
-        overrideIp: String?,
-        overridePort: String?,
-        forceOverride: Boolean,
-    ) : this(
-        parseCmdToArguments(preferences, context, overrideIp, overridePort, forceOverride)
-    )
-
     companion object {
-        private fun parseCmdToArguments(
-            preferences: SharedPreferences,
-            context: Context,
-            overrideIp: String?,
-            overridePort: String?,
-            forceOverride: Boolean,
-        ): Array<String> {
-            val cmd = preferences.getStringNotNull("byedpi_cmd_args", "-Ku -a1 -An -o1 -At,r,s -d1")
-            val preparedCmd = getLists(cmd, context)
-
-            val firstArgIndex = preparedCmd.indexOf("-")
-            val args = (if (firstArgIndex > 0) preparedCmd.substring(firstArgIndex) else preparedCmd).trim()
-
-            Log.d("ProxyPref", "CMD: $args")
-
-            val (cmdIp, cmdPort) = preferences.checkIpAndPortInCmd()
-            val ip = overrideIp ?: preferences.getStringNotNull("byedpi_proxy_ip", "127.0.0.1")
-            val port = overridePort ?: preferences.getStringNotNull("byedpi_proxy_port", "1080")
-            val enableHttp = preferences.getBoolean("byedpi_http_connect", false)
-            val hasHttp = args.contains("-G") || args.contains("--http-connect")
-
-            val prefix = buildString {
-                if (forceOverride || cmdIp == null) append("--ip $ip ")
-                if (forceOverride || cmdPort == null) append("--port $port ")
-                if (enableHttp && !hasHttp) append("--http-connect ")
+        private fun parseCmdToArguments(context: Context, command: String, host: String, port: String): Array<String> {
+            val blacklist = setOf("--help", "--version", "-h", "-v")
+            val args = shellSplit(getLists(command, context))
+                .dropWhile { !it.startsWith("-") }
+                .filter { it !in blacklist }
+            val (cmdIp, cmdPort) = args.checkIpAndPortInArgs()
+            val prefix = buildList {
+                if (cmdIp == null) addAll(listOf("--ip", host))
+                if (cmdPort == null) addAll(listOf("--port", port))
             }
 
-            Log.d("ProxyPref", "Added from settings: $prefix")
+            Log.d("ProxyPref", "CMD: ${args.joinToString(" ")}")
+            Log.d("ProxyPref", "Added from settings: ${prefix.joinToString(" ")}")
 
-            return if (prefix.isNotEmpty()) {
-                // When forceOverride, append AFTER user args so last value wins in ciadpi CLI parser.
-                // Otherwise prepend so user args can still override.
-                val combined = if (forceOverride) "$args $prefix" else "$prefix$args"
-                arrayOf("ciadpi") + shellSplit(combined)
-            } else {
-                arrayOf("ciadpi") + shellSplit(args)
-            }
+            return (listOf("ciadpi") + prefix + args).toTypedArray()
         }
 
         private fun getLists(cmd: String, context: Context): String {
@@ -95,19 +55,25 @@ class ByeDpiProxyCmdPreferences(val args: Array<String>) : ByeDpiProxyPreference
             }
         }
     }
+
+    constructor(preferences: SharedPreferences, context: Context) : this(
+        parseCmdToArguments(
+            context,
+            preferences.getCmdArgs(),
+            preferences.getStringNotNull("byedpi_proxy_ip", "127.0.0.1"),
+            preferences.getStringNotNull("byedpi_proxy_port", "1080"),
+        )
+    )
+
+    constructor(context: Context, command: String, host: String, port: Int) : this(
+        parseCmdToArguments(context, command, host, port.toString())
+    )
 }
 
 class ByeDpiProxyUIPreferences(val settings: UISettings = UISettings()) : ByeDpiProxyPreferences {
 
     constructor(preferences: SharedPreferences) : this(
         UISettings.fromSharedPreferences(preferences)
-    )
-
-    constructor(preferences: SharedPreferences, overrideIp: String?, overridePort: String?) : this(
-        UISettings.fromSharedPreferences(preferences).copy(
-            ip = overrideIp ?: UISettings.fromSharedPreferences(preferences).ip,
-            port = overridePort?.toIntOrNull() ?: UISettings.fromSharedPreferences(preferences).port
-        )
     )
 
     val uiargs: Array<String>
@@ -118,7 +84,6 @@ class ByeDpiProxyUIPreferences(val settings: UISettings = UISettings()) : ByeDpi
             if (settings.port != 0) args.add("-p${settings.port}")
             if (settings.maxConnections != 0) args.add("-c${settings.maxConnections}")
             if (settings.bufferSize != 0) args.add("-b${settings.bufferSize}")
-            if (settings.httpConnect) args.add("-G")
 
             val protocols = buildList {
                 if (settings.desyncHttps) add("t")

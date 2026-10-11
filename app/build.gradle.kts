@@ -9,6 +9,7 @@ val abis = setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 
 android {
     namespace = "io.github.romanvht.byedpi"
+    //noinspection GradleDependency
     compileSdk = 36
 
     defaultConfig {
@@ -16,6 +17,7 @@ android {
         minSdk = 21
         //noinspection OldTargetApi
         targetSdk = 34
+        // Версия пока форковская; версионированием займётся фаза D.
         versionCode = 2
         versionName = "1.0.1"
 
@@ -99,14 +101,14 @@ android {
 }
 
 dependencies {
-    implementation("androidx.fragment:fragment-ktx:1.8.9")
+    //noinspection GradleDependency
     implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-service:2.9.4")
+    implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("com.google.android.material:material:1.13.0")
-    implementation("com.google.code.gson:gson:2.13.2")
+    implementation("com.google.code.gson:gson:2.14.0")
     // JNA for libtgwsproxy.so (Rust MTProto proxy)
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     // DataStore for TG WS proxy settings

@@ -13,9 +13,26 @@ import com.google.gson.Gson
 import io.github.romanvht.byedpi.BuildConfig
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.data.AppSettings
+import java.io.File
 
 object SettingsUtils {
     private const val TAG = "SettingsUtils"
+    private val separatePreferenceKeys = setOf("byedpi_command_history", "selected_apps")
+
+    enum class Section {
+        SETTINGS,
+        HISTORY,
+        APPS,
+        DOMAIN_LISTS
+    }
+
+    fun getCurrentLanguage(context: Context): String {
+        val lang = context.getPreferences().getStringNotNull("language", "system")
+        if (lang != "system") return lang
+
+        val locales = AppCompatDelegate.getApplicationLocales()
+        return locales[0]?.language ?: java.util.Locale.getDefault().language
+    }
 
     fun setLang(lang: String) {
         val appLocale = localeByName(lang) ?: LocaleListCompat.getEmptyLocaleList()
@@ -56,115 +73,211 @@ object SettingsUtils {
         }
     }
 
-    fun exportSettings(context: Context, uri: Uri) {
+    fun exportSettings(context: Context, uri: Uri, sections: Set<Section>) {
         try {
-            val prefs = context.getPreferences()
-            val history = HistoryUtils(context).getHistory()
-            val apps = prefs.getSelectedApps()
-
-            val settings = prefs.all.filterKeys { key ->
-                key !in setOf("byedpi_command_history", "selected_apps")
-            }
-
-            val domainLists = DomainListUtils.getLists(context)
-
-            val export = AppSettings(
-                app = BuildConfig.APPLICATION_ID,
-                version = BuildConfig.VERSION_NAME,
-                history = history,
-                apps = apps,
-                domainLists = domainLists,
-                settings = settings
-            )
-
-            val json = Gson().toJson(export)
-
             context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(json.toByteArray())
+                outputStream.write(settingsJson(context, sections).toByteArray())
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to export settings", e)
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Failed to export settings", Toast.LENGTH_SHORT).show()
-            }
+            exportFailed(context, e)
         }
     }
 
-    fun importSettings(context: Context, uri: Uri, onRestart: () -> Unit) {
+    fun exportSettings(context: Context, file: File, sections: Set<Section>) {
         try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                val json = inputStream.bufferedReader().readText()
-                val import = try {
-                    Gson().fromJson(json, AppSettings::class.java)
-                } catch (e: Exception) {
-                    null
-                }
+            file.writeText(settingsJson(context, sections))
+        } catch (e: Exception) {
+            exportFailed(context, e)
+        }
+    }
 
-                if (import == null || import.app != BuildConfig.APPLICATION_ID) {
-                    Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(context, R.string.logs_failed, Toast.LENGTH_LONG).show()
-                    }
-                    return@use
-                }
+    fun readSettings(context: Context, uri: Uri): AppSettings? {
+        return try {
+            val json = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                inputStream.bufferedReader().readText()
+            } ?: return null
 
-                val prefs = context.getPreferences()
-                prefs.edit (commit = true) {
-                    clear()
-                    import.settings.forEach { (key, value) ->
-                        when (value) {
-                            is Int -> putInt(key, value)
-                            is Boolean -> putBoolean(key, value)
-                            is String -> putString(key, value)
-                            is Float -> putFloat(key, value)
-                            is Long -> putLong(key, value)
-                            is Double -> {
-                                when (value) {
-                                    value.toInt().toDouble() -> {
-                                        putInt(key, value.toInt())
-                                    }
-                                    value.toLong().toDouble() -> {
-                                        putLong(key, value.toLong())
-                                    }
-                                    else -> {
-                                        putFloat(key, value.toFloat())
+            parseSettings(context, json)
+        } catch (e: Exception) {
+            importFailed(context, e)
+            null
+        }
+    }
+
+    fun readSettings(context: Context, file: File): AppSettings? {
+        return try {
+            parseSettings(context, file.readText())
+        } catch (e: Exception) {
+            importFailed(context, e)
+            null
+        }
+    }
+
+    private fun settingsJson(context: Context, sections: Set<Section>): String {
+        val prefs = context.getPreferences()
+        val export = AppSettings(
+            app = BuildConfig.APPLICATION_ID,
+            version = BuildConfig.VERSION_NAME,
+            history = if (Section.HISTORY in sections) {
+                HistoryUtils(context).getHistory()
+            } else {
+                null
+            },
+            apps = if (Section.APPS in sections) prefs.getSelectedApps() else null,
+            domainLists = if (Section.DOMAIN_LISTS in sections) {
+                DomainListUtils.getAllLists(context)
+            } else {
+                null
+            },
+            settings = if (Section.SETTINGS in sections) {
+                prefs.all.filterKeys { it !in separatePreferenceKeys }
+            } else {
+                null
+            }
+        )
+        return Gson().toJson(export)
+    }
+
+    private fun parseSettings(context: Context, json: String): AppSettings? {
+        val settings = Gson().fromJson(json, AppSettings::class.java)
+        if (settings?.app == BuildConfig.APPLICATION_ID) return settings
+
+        Toast.makeText(context, R.string.import_failed, Toast.LENGTH_LONG).show()
+        return null
+    }
+
+    private fun exportFailed(context: Context, exception: Exception) {
+        Log.e(TAG, "Failed to export settings", exception)
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(context, R.string.export_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun importFailed(context: Context, exception: Exception) {
+        Log.e(TAG, "Failed to read settings", exception)
+        Toast.makeText(context, R.string.import_failed, Toast.LENGTH_SHORT).show()
+    }
+
+    fun getAvailableSections(settings: AppSettings): Set<Section> = buildSet {
+        if (settings.settings != null) add(Section.SETTINGS)
+        if (settings.history != null) add(Section.HISTORY)
+        if (settings.apps != null) add(Section.APPS)
+        if (settings.domainLists != null) add(Section.DOMAIN_LISTS)
+    }
+
+    fun importSettings(
+        context: Context,
+        import: AppSettings,
+        sections: Set<Section>,
+        onRestart: () -> Unit
+    ) {
+        try {
+            val prefs = context.getPreferences()
+
+            if (Section.SETTINGS in sections && import.settings != null) {
+                prefs.edit(commit = true) {
+                    prefs.all.keys
+                        .filter { it !in separatePreferenceKeys }
+                        .forEach { remove(it) }
+
+                    import.settings
+                        .filterKeys { it !in separatePreferenceKeys }
+                        .forEach { (key, value) ->
+                            when (value) {
+                                is Int -> putInt(key, value)
+                                is Boolean -> putBoolean(key, value)
+                                is String -> putString(key, value)
+                                is Float -> putFloat(key, value)
+                                is Long -> putLong(key, value)
+                                is Double -> {
+                                    when (value) {
+                                        value.toInt().toDouble() -> {
+                                            putInt(key, value.toInt())
+                                        }
+                                        value.toLong().toDouble() -> {
+                                            putLong(key, value.toLong())
+                                        }
+                                        else -> {
+                                            putFloat(key, value.toFloat())
+                                        }
                                     }
                                 }
-                            }
-                            is Collection<*> -> {
-                                if (value.all { it is String }) {
-                                    @Suppress("UNCHECKED_CAST")
-                                    putStringSet(key, (value as Collection<String>).toSet())
+                                is Collection<*> -> {
+                                    if (value.all { it is String }) {
+                                        @Suppress("UNCHECKED_CAST")
+                                        putStringSet(key, (value as Collection<String>).toSet())
+                                    }
                                 }
                             }
                         }
+                }
+            }
+
+            if (Section.APPS in sections && import.apps != null) {
+                prefs.edit(commit = true) { putStringSet("selected_apps", import.apps.toSet()) }
+            }
+
+            if (Section.HISTORY in sections && import.history != null) {
+                HistoryUtils(context).saveHistory(import.history)
+            }
+
+            if (Section.DOMAIN_LISTS in sections && import.domainLists != null) {
+                val normalized = import.domainLists.map {
+                    if (it.isBuiltIn) {
+                        it.copy(
+                            isModified = it.isModified,
+                            isDeleted = it.isDeleted
+                        )
+                    } else {
+                        it.copy(
+                            isModified = false,
+                            isDeleted = false
+                        )
                     }
-
                 }
 
-                if (import.apps !== null) {
-                    prefs.edit (commit = true) { putStringSet("selected_apps", import.apps.toSet()) }
-                }
+                DomainListUtils.saveLists(context, normalized)
+            }
 
-                if (import.history !== null) {
-                    HistoryUtils(context).saveHistory(import.history)
-                }
+            if (Section.SETTINGS in sections) {
+                val newLang = prefs.getString("language", "system") ?: "system"
+                val newTheme = prefs.getString("app_theme", "system") ?: "system"
+                setLang(newLang)
+                setTheme(newTheme)
+            }
 
-                if (import.domainLists !== null) {
-                    DomainListUtils.saveLists(context, import.domainLists)
-                }
-
-                Handler(Looper.getMainLooper()).post {
-                    val newLang = prefs.getString("language", "system") ?: "system"
-                    val newTheme = prefs.getString("app_theme", "system") ?: "system"
-                    setLang(newLang)
-                    setTheme(newTheme)
-                    onRestart()
-                }
+            Handler(Looper.getMainLooper()).post {
+                onRestart()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to import settings", e)
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Failed to import settings", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.import_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun resetSettings(context: Context, onRestart: () -> Unit) {
+        try {
+            val prefs = context.getPreferences()
+
+            prefs.edit(commit = true) {
+                clear()
+            }
+
+            HistoryUtils(context).saveHistory(emptyList())
+            DomainListUtils.resetLists(context)
+
+            setLang("system")
+            setTheme("system")
+
+            Handler(Looper.getMainLooper()).post {
+                onRestart()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reset settings", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Failed to reset settings", Toast.LENGTH_SHORT).show()
             }
         }
     }

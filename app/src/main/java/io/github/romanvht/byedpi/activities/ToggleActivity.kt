@@ -1,17 +1,21 @@
 package io.github.romanvht.byedpi.activities
 
 import android.app.Activity
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.VpnService
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import androidx.core.content.edit
 import io.github.romanvht.byedpi.data.AppStatus
 import io.github.romanvht.byedpi.data.Mode
+import io.github.romanvht.byedpi.data.RESTART_ACTION
+import io.github.romanvht.byedpi.data.START_ACTION
+import io.github.romanvht.byedpi.data.STOP_ACTION
+import io.github.romanvht.byedpi.receiver.ServiceActionReceiver
 import io.github.romanvht.byedpi.services.ServiceManager
 import io.github.romanvht.byedpi.services.appStatus
+import io.github.romanvht.byedpi.utility.getCmdArgs
 import io.github.romanvht.byedpi.utility.getPreferences
 import io.github.romanvht.byedpi.utility.mode
 
@@ -25,6 +29,7 @@ class ToggleActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ServiceManager.refresh(this)
 
         prefs = getPreferences()
         val strategy = intent.getStringExtra("strategy")
@@ -69,7 +74,7 @@ class ToggleActivity : Activity() {
             return
         }
 
-        ServiceManager.start(this, mode)
+        sendServiceAction(START_ACTION, mode)
         Log.i(TAG, "Toggle service start")
     }
 
@@ -80,13 +85,18 @@ class ToggleActivity : Activity() {
             return
         }
 
-        ServiceManager.restart(this, mode)
+        sendServiceAction(RESTART_ACTION, mode)
         Log.i(TAG, "Toggle service start")
     }
 
     private fun stopService() {
-        ServiceManager.stop(this)
+        sendServiceAction(STOP_ACTION, appStatus.second)
         Log.i(TAG, "Toggle service stop")
+    }
+
+    private fun sendServiceAction(action: String, mode: Mode) {
+        sendBroadcast(Intent(this, ServiceActionReceiver::class.java).setAction(action)
+            .putExtra(ServiceActionReceiver.EXTRA_MODE, mode.name))
     }
 
     private fun toggleService(restart: Boolean) {
@@ -106,7 +116,7 @@ class ToggleActivity : Activity() {
     }
 
     private fun updateStrategy(strategy: String?): Boolean {
-        val current = prefs.getString("byedpi_cmd_args", null)
+        val current = prefs.getCmdArgs()
         if (strategy != null && strategy != current) {
             prefs.edit(commit = true) { putString("byedpi_cmd_args", strategy) }
             Log.i(TAG, "Strategy updated to: $strategy")

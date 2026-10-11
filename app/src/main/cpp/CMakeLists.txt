@@ -12,10 +12,12 @@ set(BYE_DPI_SRC
     ${CMAKE_CURRENT_LIST_DIR}/byedpi/proxy.c
 )
 
-add_library(byedpi SHARED ${BYE_DPI_SRC} native-lib.c)
+add_library(byedpi SHARED ${BYE_DPI_SRC} byedpi-jni.c hev-jni.c)
 target_include_directories(byedpi PRIVATE byedpi)
 
 target_compile_options(byedpi PRIVATE -std=c99 -O2 -Wall -Wno-unused -Wextra -Wno-unused-parameter -pedantic)
 target_compile_definitions(byedpi PRIVATE ANDROID_APP)
 
-target_link_libraries(byedpi PRIVATE android log)
+target_link_libraries(byedpi PRIVATE android log dl)
+target_link_options(byedpi PRIVATE "-Wl,--wrap=daemon")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
