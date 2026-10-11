@@ -17,9 +17,12 @@ android {
         minSdk = 21
         //noinspection OldTargetApi
         targetSdk = 34
-        // Версия пока форковская; версионированием займётся фаза D.
-        versionCode = 2
-        versionName = "1.0.1"
+        // Форковое версионирование (фаза D): база — версия апстрима
+        // romanvht/ByeByeDPI. versionCode наследует апстрим-кодировку
+        // M*1000+m*100+p*10 (1.8.2 -> 1820) плюс форк-бамп в младшем
+        // разряде; versionName — база апстрима + суффикс -tg.N.
+        versionCode = 1821
+        versionName = "1.8.2-tg.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
