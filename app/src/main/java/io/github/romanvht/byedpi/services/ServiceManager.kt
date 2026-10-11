@@ -4,22 +4,29 @@ import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.data.*
+import io.github.romanvht.byedpi.ewenloy.tgws.EwenloyTgWsServiceExtension
+import io.github.romanvht.byedpi.utility.createConnectionNotification
 import io.github.romanvht.byedpi.utility.createPauseNotification
+import io.github.romanvht.byedpi.utility.getPreferences
 import io.github.romanvht.byedpi.utility.registerNotificationChannel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 object ServiceManager {
     private const val TAG = "ServiceManager"
     private const val PAUSE_NOTIFICATION_ID = 3
+    private const val TG_WS_START_DELAY_MS = 400L
+    private const val NOTIFY_REFRESH_INTERVAL_MS = 1500L
     private val scope = CoroutineScope(
         Dispatchers.Main.immediate + SupervisorJob() + CoroutineExceptionHandler {
             _, error -> Log.e(TAG, "Service command failed", error)
@@ -29,6 +36,13 @@ object ServiceManager {
     private val mutex = Mutex()
     private var application: Application? = null
     private var session: Session? = null
+
+    // TG WS hooks живут только в основном процессе: EwenloyTgWsServiceExtension
+    // читает SharedPreferences и статику TgWsProxyService, которые корректны
+    // только там (:native-процесс их не разделяет)
+    private val tgWsExt = EwenloyTgWsServiceExtension()
+    private val tgWsInitialized = AtomicBoolean()
+    private var notifyRefreshJob: Job? = null
 
     private class Session(val mode: Mode, val engine: NativeEngine) {
         val configuration = CompletableDeferred<Configuration>()
@@ -165,6 +179,8 @@ object ServiceManager {
         publish(mode, AppStatus.Running, STARTED_BROADCAST)
         (app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(PAUSE_NOTIFICATION_ID)
         monitor(current, launchService = true)
+        startTgWs(app)
+        startNotifyRefresh()
         try {
             configured?.complete(current.configured.await())
             current.started.await()
@@ -179,6 +195,7 @@ object ServiceManager {
             current.stopping = true
             current.started.complete(false)
             current.job?.cancel()
+            stopNotifyRefresh()
         }
         if (await) current.stopped.await()
     }
@@ -194,6 +211,7 @@ object ServiceManager {
 
     private fun restore(app: Application) {
         application = app
+        initTgWs(app)
         if (session != null || TestService.isRunning) return
         val running = NativeEngine.running(app)
         if (running == null) {
@@ -209,6 +227,10 @@ object ServiceManager {
         session = current
         publish(current.mode, AppStatus.Running, STARTED_BROADCAST)
         monitor(current, launchService = false)
+        startNotifyRefresh()
+        // Основной процесс мог быть перезапущен при живом :native — поднимаем
+        // TG заново (guard внутри TgWsProxyService.startProxy защищает от дублей)
+        if (!tgWsExt.isRunning()) startTgWs(app)
     }
 
     private fun monitor(current: Session, launchService: Boolean) {
@@ -270,6 +292,7 @@ object ServiceManager {
     }
 
     private fun finish(current: Session, failed: Boolean) {
+        stopNotifyRefresh()
         current.engine.onStopping = null
         if (session === current) {
             session = null
@@ -277,6 +300,93 @@ object ServiceManager {
         }
         current.started.complete(false)
         current.stopped.complete(Unit)
+    }
+
+    // ---- TG WS hooks (основной процесс; реинтеграция фазы B) ----
+    // TG управляется независимо от жизненного цикла ByeDPI-сессии:
+    // stopSession/finish не трогают TgWsProxyService — остановка TG идёт
+    // только через выключение префы (листенер ниже) или явный stop из UI.
+
+    private fun initTgWs(app: Application) {
+        if (!tgWsInitialized.compareAndSet(false, true)) return
+        val preferences = app.getPreferences()
+        try {
+            tgWsExt.initialize(app, preferences)
+        } catch (e: Exception) {
+            Log.e(TAG, "tgws init", e)
+        }
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY &&
+                appStatus.first == AppStatus.Running
+            ) {
+                scope.launch {
+                    try {
+                        tgWsExt.refreshFromPreferences(app.getPreferences())
+                        refreshStatusNotification()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "tgws pref sync", e)
+                    }
+                }
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    private fun startTgWs(app: Application) {
+        initTgWs(app)
+        scope.launch {
+            // Задержка унаследована из старой сервисной архитектуры (142de62):
+            // основной туннель должен опередить старт TG WS
+            delay(TG_WS_START_DELAY_MS)
+            try {
+                tgWsExt.start(app.getPreferences())
+            } catch (e: Exception) {
+                Log.e(TAG, "tgws start", e)
+            }
+        }
+    }
+
+    private fun startNotifyRefresh() {
+        stopNotifyRefresh()
+        notifyRefreshJob = scope.launch {
+            while (session != null && appStatus.first == AppStatus.Running) {
+                try {
+                    refreshStatusNotification()
+                } catch (_: Exception) {
+                }
+                delay(NOTIFY_REFRESH_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopNotifyRefresh() {
+        notifyRefreshJob?.cancel()
+        notifyRefreshJob = null
+    }
+
+    private fun refreshStatusNotification() {
+        val app = application ?: return
+        val mode = appStatus.second
+        val vpn = mode == Mode.VPN
+        val channelId = if (vpn) "ByeDPIVpn" else "ByeDPI Proxy"
+        val channelName = if (vpn) R.string.vpn_channel_name else R.string.proxy_channel_name
+        val content = if (vpn) R.string.vpn_notification_content else R.string.proxy_notification_content
+        val notificationId = if (vpn) {
+            ByeDpiVpnService.FOREGROUND_SERVICE_ID
+        } else {
+            ByeDpiProxyService.FOREGROUND_SERVICE_ID
+        }
+        registerNotificationChannel(app, channelId, channelName)
+        val notification = createConnectionNotification(
+            app,
+            channelId,
+            R.string.notification_title,
+            content,
+            mode,
+            tgWsExt.statusLine().takeIf { it.isNotBlank() },
+            pid = 0,
+        )
+        (app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(notificationId, notification)
     }
 
     private fun publish(mode: Mode, status: AppStatus, action: String) {
