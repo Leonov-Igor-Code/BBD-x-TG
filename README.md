@@ -71,7 +71,7 @@ Telegram → 127.0.0.1:1082 (MTProto) → движок на Rust → WSS (чер
 | JDK | 17 |
 | Android SDK | compileSdk 36 · targetSdk 34 · minSdk 21 |
 | NDK / CMake | 27.0.12077973 / 3.22.1 |
-| Rust-ядро `tgwsproxy` | 1.0.0 (edition 2021, Rust 1.70+) |
+| Rust-ядро `tgwsproxy` | 1.0.0 (edition 2021, синхронизация с апстримом 2026-10) |
 | [byedpi](https://github.com/hufrea/byedpi) | git-сабмодуль |
 | [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) | git-сабмодуль |
 
@@ -120,6 +120,14 @@ git submodule update --init --recursive
 > На Windows без прав на симлинки git раскладывает ссылки в `hev-socks5-tunnel` текстовыми заглушками — включите `core.symlinks` или собирайте в WSL.
 
 Нужны JDK 17 и Android SDK (NDK скачается сам). Собирать Rust **не нужно** — готовые `.so` движка уже лежат в `app/src/main/tglibs/`.
+
+Правки Rust-ядра пересобираются отдельно (Windows, нужны [Rust](https://rustup.rs) и NDK):
+
+```bat
+third-party\tg-ws-proxy-rs\build_so.bat
+```
+
+Скрипт сам находит Android SDK (переменные окружения, `local.properties` или стандартный путь), собирает оба ABI и кладёт свежие `.so` в `app/src/main/tglibs/`.
 
 </details>
 
