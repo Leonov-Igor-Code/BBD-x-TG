@@ -23,7 +23,6 @@ import io.github.romanvht.byedpi.ewenloy.tgws.EwenloyTgWsServiceExtension
 import io.github.romanvht.byedpi.services.ServiceManager
 import io.github.romanvht.byedpi.services.appStatus
 import io.github.romanvht.byedpi.utility.*
-import androidx.core.net.toUri
 
 class MainSettingsFragment : PreferenceFragmentCompat() {
     companion object {
@@ -147,12 +146,6 @@ class MainSettingsFragment : PreferenceFragmentCompat() {
         findPreferenceNotNull<Preference>("storage_access")
             .setOnPreferenceClickListener {
                 PermissionUtils.requestStorageAccess(this)
-                true
-            }
-
-        findPreferenceNotNull<Preference>("donate")
-            .setOnPreferenceClickListener {
-                showDonateDialog()
                 true
             }
 
@@ -457,32 +450,4 @@ class MainSettingsFragment : PreferenceFragmentCompat() {
             .show()
     }
 
-    private fun showDonateDialog() {
-        val context = requireContext()
-
-        val items = arrayOf(
-            getString(R.string.donate_message),
-            getString(R.string.donate_cloudtips),
-            getString(R.string.donate_boosty),
-            getString(R.string.donate_telegram_bot),
-            getString(R.string.donate_thanks),
-        )
-
-        AlertDialog.Builder(context)
-            .setTitle(getString(R.string.donate))
-            .setItems(items) { _, which ->
-                when (which) {
-                    1 -> openUrl("https://pay.cloudtips.ru/p/92c754db")
-                    2 -> openUrl("https://boosty.to/romanvht/donate")
-                    3 -> openUrl("https://t.me/romanvht_donate_bot")
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun openUrl(url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-        startActivity(intent)
-    }
 }

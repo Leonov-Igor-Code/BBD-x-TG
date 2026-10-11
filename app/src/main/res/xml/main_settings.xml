@@ -223,15 +223,10 @@
         <Preference
             android:key="donate"
             android:icon="@drawable/ic_favorite"
-            android:title="@string/donate" />
-
-        <Preference
-            android:key="telegram_group"
-            android:title="@string/telegram_link"
-            android:icon="@drawable/ic_telegram">
+            android:title="@string/donate">
             <intent
                 android:action="android.intent.action.VIEW"
-                android:data="https://t.me/byebyedpi_group" />
+                android:data="https://pay.cloudtips.ru/p/ae0eac6d" />
         </Preference>
 
         <Preference
@@ -240,7 +235,7 @@
             android:icon="@drawable/ic_github">
             <intent
                 android:action="android.intent.action.VIEW"
-                android:data="https://github.com/romanvht/ByeDPIAndroid" />
+                android:data="https://github.com/Leonov-Igor-Code/ByeByeDPI-x-tg" />
         </Preference>
 
         <Preference
