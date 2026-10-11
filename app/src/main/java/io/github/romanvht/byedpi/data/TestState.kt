@@ -9,4 +9,7 @@ data class TestState(
     val strategies: List<StrategyResult> = emptyList(),
     val failed: Boolean = false,
     val wasInterrupted: Boolean = false,
+    // Фоновая диагностика TG WS (форк): не блокирует тест стратегий
+    val isTgWsChecking: Boolean = false,
+    val tgWsReport: String = "",
 )

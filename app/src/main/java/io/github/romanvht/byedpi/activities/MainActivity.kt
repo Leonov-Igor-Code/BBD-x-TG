@@ -248,11 +248,11 @@ class MainActivity : BaseActivity() {
         }
 
         // Тап по статус-строке TG WS — открыть логи прокси (форк)
-        binding.tgWsStatusText?.setOnClickListener {
+        binding.tgWsStatusText.setOnClickListener {
             startActivity(Intent(this, TgWsLogsActivity::class.java))
         }
 
-        binding.tgProxyButton?.setOnClickListener {
+        binding.tgProxyButton.setOnClickListener {
             val prefs = getPreferences()
             val tgWsEnabled = prefs.getBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, false)
             if (tgWsEnabled) {
@@ -268,7 +268,7 @@ class MainActivity : BaseActivity() {
             }
         }
 
-        binding.tgWsToggleButton?.setOnClickListener {
+        binding.tgWsToggleButton.setOnClickListener {
             val prefs = getPreferences()
             val current = prefs.getBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, false)
             prefs.edit().putBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, !current).apply()
@@ -615,7 +615,7 @@ class MainActivity : BaseActivity() {
         val prefs = getPreferences()
         val enabled = prefs.getBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, false)
 
-        val tv = binding.tgWsStatusText ?: return
+        val tv = binding.tgWsStatusText
         if (enabled) {
             // TG WS прокси работает независимо от основного сервиса
             if (!TgWsProxyService.isRunning.value &&
@@ -647,8 +647,8 @@ class MainActivity : BaseActivity() {
 
     private fun updateTgWsToggleButton() {
         val enabled = getPreferences().getBoolean(EwenloyTgWsServiceExtension.EWENLOY_TG_WS_MODE_KEY, false)
-        val btn = binding.tgWsToggleButton ?: return
-        val icon = binding.tgWsToggleIcon ?: return
+        val btn = binding.tgWsToggleButton
+        val icon = binding.tgWsToggleIcon
         if (enabled) {
             btn.setCardBackgroundColor(ContextCompat.getColor(this, R.color.green_active))
             icon.setColorFilter(ContextCompat.getColor(this, android.R.color.white))

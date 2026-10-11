@@ -20,6 +20,9 @@ import com.google.gson.reflect.TypeToken
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.activities.TestActivity
 import io.github.romanvht.byedpi.data.*
+import io.github.romanvht.byedpi.ewenloy.tgws.EwenloyTgWsServiceExtension
+import io.github.romanvht.byedpi.ewenloy.tgws.NativeProxy
+import io.github.romanvht.byedpi.ewenloy.tgws.TgWsProxyService
 import io.github.romanvht.byedpi.utility.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,9 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.SocketTimeoutException
 
 class TestService : Service() {
 
@@ -38,6 +44,10 @@ class TestService : Service() {
         private const val CHANNEL = "Proxy test"
         private const val RESULTS_FILE = "proxy_test_results.json"
         private const val NOTIFICATION_ID = 4
+        private const val NOTIFICATION_ID_TG = 5
+        private const val PROTO_MTPROTO = 0
+        private const val PROTO_SOCKS5 = 1
+        private const val PROTO_UNKNOWN = 2
         private val mutableState = MutableStateFlow(TestState())
         private val resultsLock = Any()
         val state: StateFlow<TestState> = mutableState.asStateFlow()
@@ -67,6 +77,25 @@ class TestService : Service() {
         fun stop() {
             if (!isRunning) return
             mutableState.value = state.value.copy(isStopping = true)
+        }
+
+        /**
+         * Фоновая диагностика TG WS (форк): запускает сервис с отдельным action.
+         * Отчёт публикуется в [TestState.tgWsReport] и в уведомлении, проверка
+         * не прерывается при выходе с экрана TestActivity.
+         */
+        fun startTgWsCheck(context: Context) {
+            val previous = state.value
+            if (previous.isTgWsChecking) return
+            mutableState.value = previous.copy(isTgWsChecking = true, tgWsReport = "")
+            try {
+                ContextCompat.startForegroundService(
+                    context, Intent(context, TestService::class.java).setAction(TG_WS_CHECK_ACTION)
+                )
+            } catch (e: Exception) {
+                mutableState.value = previous
+                Log.e(TAG, "Failed to start TG WS check", e)
+            }
         }
 
         suspend fun awaitStopped() {
@@ -107,6 +136,7 @@ class TestService : Service() {
     private val engineMutex = Mutex()
     private var engine: NativeEngine? = null
     private var testJob: Job? = null
+    private var tgWsJob: Job? = null
     private var lastStartId = 0
     private var destroyed = false
     private var notifiedStrategy = -1
@@ -146,6 +176,24 @@ class TestService : Service() {
                 stop()
                 if (testJob == null) stopSelfResult(startId)
             }
+            TG_WS_CHECK_ACTION -> {
+                try {
+                    startTgWsForeground()
+                    if (!state.value.isTgWsChecking) {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                        stopSelfResult(startId)
+                    } else if (tgWsJob == null) {
+                        runTgWsCheck(startId)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to show TG WS check notification", e)
+                    if (tgWsJob == null) {
+                        mutableState.value = state.value.copy(isTgWsChecking = false)
+                        stopSelfResult(startId)
+                    }
+                }
+            }
             else -> if (testJob == null) stopSelfResult(startId)
         }
         return START_NOT_STICKY
@@ -154,6 +202,9 @@ class TestService : Service() {
     override fun onDestroy() {
         destroyed = true
         if (testJob != null) stop()
+        if (tgWsJob != null) {
+            mutableState.value = state.value.copy(isTgWsChecking = false)
+        }
         scope.cancel()
         super.onDestroy()
     }
@@ -402,6 +453,155 @@ class TestService : Service() {
             .addAction(0, getString(R.string.test_stop), PendingIntent.getService(this, 0,
                 Intent(this, TestService::class.java).setAction(STOP_ACTION), PendingIntent.FLAG_IMMUTABLE))
             .build()
+    }
+
+    // ---- TG WS background diagnostics (форк, фаза C-2) ----
+
+    private fun runTgWsCheck(startId: Int) {
+        tgWsJob = scope.launch {
+            try {
+                val report = runTgWsChecks()
+                withContext(NonCancellable) {
+                    mutableState.value = state.value.copy(isTgWsChecking = false, tgWsReport = report)
+                    (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+                        .notify(NOTIFICATION_ID_TG, tgWsNotification(report))
+                    @Suppress("DEPRECATION")
+                    stopForeground(false) // уведомление с результатом остаётся
+                    stopSelfResult(startId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "TG WS check failed", e)
+                withContext(NonCancellable) {
+                    mutableState.value = state.value.copy(isTgWsChecking = false)
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                    stopSelfResult(startId)
+                }
+            } finally {
+                tgWsJob = null
+            }
+        }
+    }
+
+    /**
+     * Пять проверок TG WS: сервис, локальный порт, тип протокола, секрет
+     * нативного ядра, доступность удалённого WS-сервера. Тот же отчёт,
+     * что раньше собирался в TestActivity (перенесено, чтобы работало в фоне).
+     */
+    private suspend fun runTgWsChecks(): String {
+        val report = StringBuilder()
+
+        // 1) Сервис TG WS запущен?
+        val serviceRunning = TgWsProxyService.isRunning.value
+        report.append(
+            getString(if (serviceRunning) R.string.test_tg_ws_service_on else R.string.test_tg_ws_service_off)
+        ).append('\n')
+
+        // 2) Слушается ли локальный порт прокси?
+        val tgPort = EwenloyTgWsServiceExtension.TG_WS_PORT
+        val localOk = withContext(Dispatchers.IO) { isHostReachable("127.0.0.1", tgPort, 3000) }
+        report.append(
+            getString(if (localOk) R.string.test_tg_ws_port_ok else R.string.test_tg_ws_port_fail, tgPort)
+        ).append('\n')
+
+        // 3) Тип протокола на локальном порту: MTProto или SOCKS5?
+        val protoResult = if (localOk) withContext(Dispatchers.IO) {
+            detectProxyProtocol("127.0.0.1", tgPort)
+        } else PROTO_UNKNOWN
+        report.append(
+            when (protoResult) {
+                PROTO_MTPROTO -> getString(R.string.test_tg_ws_proto_ok, tgPort)
+                PROTO_SOCKS5 -> getString(R.string.test_tg_ws_proto_socks, tgPort)
+                else -> getString(R.string.test_tg_ws_proto_unknown, tgPort)
+            }
+        ).append('\n')
+
+        // 4) Живое ли нативное ядро (.so) и корректный ли секрет?
+        withContext(Dispatchers.IO) {
+            try {
+                val secret = NativeProxy.getSecretWithPrefix()
+                if (secret != null && secret.startsWith("dd") && secret.length == 34) {
+                    report.append(getString(R.string.test_tg_ws_secret_ok, secret.take(10))).append('\n')
+                } else {
+                    report.append(getString(R.string.test_tg_ws_secret_fail, "bad secret")).append('\n')
+                }
+            } catch (t: Throwable) {
+                report.append(
+                    getString(R.string.test_tg_ws_secret_fail, t.message ?: t.javaClass.simpleName)
+                ).append('\n')
+            }
+        }
+
+        // 5) Доступен ли удалённый WS-сервер Telegram (без прокси)?
+        val host = "kws1.web.telegram.org"
+        val remoteOk = withContext(Dispatchers.IO) { isHostReachable(host, 443, 4000) }
+        report.append(
+            getString(if (remoteOk) R.string.test_tg_ws_remote_ok else R.string.test_tg_ws_remote_fail, host)
+        )
+
+        return report.toString()
+    }
+
+    private fun startTgWsForeground() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID_TG, tgWsNotification(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIFICATION_ID_TG, tgWsNotification(null))
+        }
+    }
+
+    private fun tgWsNotification(report: String?): Notification {
+        val builder = NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(getString(R.string.test_tg_ws_button))
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setContentIntent(
+                PendingIntent.getActivity(this, 0, Intent(this, TestActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+            )
+        if (report == null) {
+            builder.setProgress(0, 0, true).setOngoing(true)
+        } else {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(report)).setAutoCancel(true)
+        }
+        return builder.build()
+    }
+
+    /**
+     * Определяет тип прокси на локальном порту.
+     * MTProto-прокси (tgwsproxy) ждёт 64-байтный obfuscated2-handshake и молчит
+     * на чужие данные. SOCKS5-сервер ответил бы 0x05 на greeting \x05\x01\x00.
+     */
+    private fun detectProxyProtocol(host: String, port: Int): Int {
+        return try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, port), 3000)
+                socket.soTimeout = 2500
+                val out = socket.getOutputStream()
+                out.write(byteArrayOf(0x05, 0x01, 0x00)) // SOCKS5 greeting
+                out.flush()
+                when (val first = socket.getInputStream().read()) {
+                    0x05 -> PROTO_SOCKS5          // ответил как SOCKS5 — не то
+                    -1 -> PROTO_MTPROTO           // сразу закрыл — поведение MTProto
+                    else -> PROTO_UNKNOWN         // неизвестный ответ
+                }
+            }
+        } catch (_: SocketTimeoutException) {
+            PROTO_MTPROTO // молчит, ждёт 64-байтный handshake — это MTProto
+        } catch (_: Exception) {
+            PROTO_UNKNOWN // соединение сброшено или иная ошибка
+        }
+    }
+
+    private fun isHostReachable(host: String, port: Int, timeoutMs: Int): Boolean {
+        return try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, port), timeoutMs)
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun startForeground() {
