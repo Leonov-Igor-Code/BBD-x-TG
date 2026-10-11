@@ -161,7 +161,7 @@
                             android:id="@+id/tg_ws_toggle_icon"
                             android:layout_width="32dp"
                             android:layout_height="32dp"
-                            android:src="@drawable/ic_toggle"
+                            android:src="@drawable/ic_telegram_plane"
                             android:contentDescription="@string/tg_ws_toggle_btn"
                             app:tint="?attr/colorPrimary" />
     
@@ -170,6 +170,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:gravity="center"
+                            android:minLines="2"
                             android:text="@string/tg_ws_toggle_btn"
                             android:textSize="14sp"
                             android:textColor="?android:textColorPrimary" />
@@ -199,7 +201,7 @@
                         <ImageView
                             android:layout_width="32dp"
                             android:layout_height="32dp"
-                            android:src="@drawable/ic_telegram"
+                            android:src="@drawable/ic_telegram_plane"
                             android:contentDescription="@string/ewenloy_tg_open_proxy_title"
                             app:tint="?attr/colorPrimary" />
     
@@ -207,6 +209,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:gravity="center"
+                            android:minLines="2"
                             android:text="@string/ewenloy_tg_open_proxy_title"
                             android:textSize="14sp"
                             android:textColor="?android:textColorPrimary" />
