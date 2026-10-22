@@ -59,6 +59,101 @@ mod spec_tests {
         let other = hex::decode("ffffffffffffffffffffffffffffffff").unwrap();
         assert!(verify_client_hello(&hello, &other).is_none());
     }
+
+    /// End-to-end: серверная сторона FakeTLS против эмулятора ee-клиента.
+    /// Клиент: ClientHello -> валидация ServerHello (HMAC server_random, CCS,
+    /// APPDATA) -> APPDATA с 64-байтным init -> чтение эха.
+    #[tokio::test]
+    async fn e2e_fake_tls_server_serves_client() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let secret_hex = "0123456789abcdef0123456789abcdef".to_string();
+        let masking = "microsoft.com".to_string();
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let secret_server = secret_hex.clone();
+        let masking_server = masking.clone();
+        let server = tokio::spawn(async move {
+            let (conn, _) = listener.accept().await.unwrap();
+            let mut conn = conn;
+            let mut first = [0u8; 1];
+            conn.read_exact(&mut first).await.unwrap();
+            assert_eq!(first[0], TLS_RECORD_HANDSHAKE, "сервер должен увидеть TLS-байт");
+            let stream = server_handshake(conn, first[0], &hex::decode(&secret_server).unwrap(), &masking_server, "e2e")
+                .await
+                .expect("server_handshake должен пройти");
+            let mut r = stream.read;
+            let mut w = stream.write;
+            // serve_core-семантика: ждём 64-байтный init, отвечаем эхом
+            let mut init = vec![0u8; 64];
+            r.read_exact(&mut init).await.expect("init из APPDATA должен читаться");
+            w.write_all(&init).await.unwrap();
+        });
+
+        let secret = hex::decode(&secret_hex).unwrap();
+        let hello = build_ee_client_hello(&secret_hex, &masking);
+
+        let mut client = tokio::net::TcpStream::connect(addr).await.unwrap();
+        client.write_all(&hello).await.unwrap();
+
+        // --- Валидация ответа как настоящий ee-клиент ---
+        let mut resp = Vec::new();
+        // ServerHello record: 5 + 0x7a
+        let mut sh = vec![0u8; 5 + 0x7a];
+        client.read_exact(&mut sh).await.unwrap();
+        assert_eq!(sh[0], TLS_RECORD_HANDSHAKE, "первым должен быть ServerHello");
+        // CCS: 6 байт
+        let mut ccs = [0u8; 6];
+        client.read_exact(&mut ccs).await.unwrap();
+        assert_eq!(&ccs, &[0x14, 0x03, 0x03, 0x00, 0x01, 0x01], "затем CCS");
+        // APPDATA header + тело
+        let mut hdr = [0u8; 5];
+        client.read_exact(&mut hdr).await.unwrap();
+        assert_eq!(hdr[0], TLS_RECORD_APPDATA, "затем APPDATA");
+        let n = u16::from_be_bytes([hdr[3], hdr[4]]) as usize;
+        let mut body = vec![0u8; n];
+        client.read_exact(&mut body).await.unwrap();
+        resp.extend_from_slice(&sh);
+        resp.extend_from_slice(&ccs);
+        resp.extend_from_slice(&hdr);
+        resp.extend_from_slice(&body);
+
+        // server_random = HMAC(secret, client_random || response_c_zeroed_random)
+        // Клиентская проверка: HMAC по ответу с ОБНУЛЁННЫМ server_random.
+        let mut zeroed_resp = resp.clone();
+        for b in &mut zeroed_resp[SH_RANDOM_OFF..SH_RANDOM_OFF + 32] {
+            *b = 0;
+        }
+        let mut mac = HmacSha256::new_from_slice(&secret).unwrap();
+        mac.update(&hello[CLIENT_RANDOM_OFFSET..CLIENT_RANDOM_OFFSET + 32]);
+        mac.update(&zeroed_resp);
+        let expected = mac.finalize().into_bytes();
+        assert_eq!(
+            &resp[SH_RANDOM_OFF..SH_RANDOM_OFF + 32],
+            &expected[..32],
+            "server_random должен сходиться с HMAC (клиентская проверка)"
+        );
+        // session_id должен вернуться тем же
+        assert_eq!(
+            &resp[SH_SESSID_OFF..SH_SESSID_OFF + 32],
+            &hello[SESSION_ID_OFFSET..SESSION_ID_OFFSET + SESSION_ID_LEN],
+            "session_id эхом"
+        );
+
+        // --- init в APPDATA и чтение эха ---
+        let init: Vec<u8> = (0u8..64).collect();
+        let mut frame = vec![TLS_RECORD_APPDATA, 0x03, 0x03, 0x00, 64];
+        frame.extend_from_slice(&init);
+        client.write_all(&frame).await.unwrap();
+
+        let mut echo = vec![0u8; 5 + 64];
+        client.read_exact(&mut echo).await.unwrap();
+        assert_eq!(echo[0], TLS_RECORD_APPDATA, "эхо должно прийти в APPDATA");
+        assert_eq!(&echo[5..], &init[..], "эхо должно совпасть с init");
+
+        server.await.unwrap();
+    }
 }
 
 use crate::config::{log_debug, log_warn, STATS};
@@ -102,7 +197,7 @@ pub struct FakeTlsStream {
 }
 
 fn server_hello_template() -> Vec<u8> {
-    let mut v = Vec::with_capacity(128);
+    let mut v = Vec::with_capacity(127);
     v.extend_from_slice(&[0x16, 0x03, 0x03, 0x00, 0x7a]);
     v.extend_from_slice(&[0x02, 0x00, 0x00, 0x76]);
     v.extend_from_slice(&[0x03, 0x03]);
@@ -110,7 +205,10 @@ fn server_hello_template() -> Vec<u8> {
     v.push(0x20);
     v.extend_from_slice(&[0u8; 32]);
     v.extend_from_slice(&[0x13, 0x01, 0x00]);
-    v.extend_from_slice(&[0x00, 0x2e, 0x00]);
+    // ФОРК: фикс портирования — в оригинале Flowseal здесь ровно 2 байта
+    // (\x00\x2e), лишний 0x00 раздувал шаблон до 128 байт при record-длине
+    // 0x7a=122 и сдвигал все поля — клиент отвергал ServerHello.
+    v.extend_from_slice(&[0x00, 0x2e]);
     v.extend_from_slice(&[0x00, 0x33, 0x00, 0x24, 0x00, 0x1d, 0x00, 0x20]);
     v.extend_from_slice(&[0u8; 32]);
     v.extend_from_slice(&[0x00, 0x2b, 0x00, 0x02, 0x03, 0x04]);
@@ -170,7 +268,7 @@ fn verify_client_hello(data: &[u8], secret: &[u8]) -> Option<([u8; 32], [u8; 32]
 
 fn build_server_hello(secret: &[u8], client_random: &[u8; 32], session_id: &[u8; 32]) -> Vec<u8> {
     let mut sh = server_hello_template();
-    debug_assert_eq!(sh.len(), 128);
+    debug_assert_eq!(sh.len(), 127);
     sh[SH_SESSID_OFF..SH_SESSID_OFF + 32].copy_from_slice(session_id);
 
     let mut pubkey = [0u8; 32];
