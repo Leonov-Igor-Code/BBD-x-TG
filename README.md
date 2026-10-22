@@ -100,7 +100,7 @@ Telegram → 127.0.0.1:1082 (MTProto) → движок на Rust → WSS (чер
 
 | Компонент | Версия |
 |---|---|
-| Приложение | `1.8.2-tg.3` (versionCode 1824) |
+| Приложение | `1.8.2-tg.4` (versionCode 1825) |
 | Kotlin | 2.2.0 |
 | Android Gradle Plugin | 8.11.0 |
 | Gradle | 8.14.3 |
@@ -117,7 +117,7 @@ Rust-движок собирается отдельно и поставляет�
 
 ## Быстрый старт
 
-1. Скачайте актуальный APK со **[страницы релизов](https://github.com/Leonov-Igor-Code/ByeByeDPI-x-tg/releases/latest)**.
+1. Скачайте актуальный APK со **[страницы релизов](https://github.com/Leonov-Igor-Code/BBD-x-TG/releases/latest)**.
 2. Установите приложение (Android попросит разрешить установку — это нормально, приложение мимо Google Play).
 3. Нажмите большую кнопку ⏻ — заработают сайты.
 4. Для Telegram включите зелёный переключатель **TG WS**.
