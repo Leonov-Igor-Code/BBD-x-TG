@@ -22,7 +22,7 @@ android {
         // M*1000+m*100+p*10 (1.8.2 -> 1820) плюс форк-бамп в младшем
         // разряде; versionName — база апстрима + суффикс -tg.N.
         versionCode = 1824
-        versionName = "1.8.2-tg.3.1"
+        versionName = "1.8.2-tg.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
