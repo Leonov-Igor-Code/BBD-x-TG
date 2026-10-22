@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ByeByeDPI-x-tg"
+rootProject.name = "BBD-x-TG"
 include(":app")
