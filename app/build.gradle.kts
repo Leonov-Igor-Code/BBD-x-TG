@@ -21,8 +21,8 @@ android {
         // romanvht/ByeByeDPI. versionCode наследует апстрим-кодировку
         // M*1000+m*100+p*10 (1.8.2 -> 1820) плюс форк-бамп в младшем
         // разряде; versionName — база апстрима + суффикс -tg.N.
-        versionCode = 1822
-        versionName = "1.8.2-tg.2"
+        versionCode = 1823
+        versionName = "1.8.2-tg.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

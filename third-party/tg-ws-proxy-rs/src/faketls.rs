@@ -1,3 +1,66 @@
+//! Спека ee-ClientHello (MTProto FakeTLS): клиентский пакет по спецификации
+//! должен проходить verify_client_hello, с чужим секретом — отвергаться.
+#[cfg(test)]
+mod spec_tests {
+    use super::*;
+
+    fn build_ee_client_hello(secret_hex: &str, domain: &str) -> Vec<u8> {
+        use hmac::Mac;
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let secret = hex::decode(secret_hex).unwrap();
+
+        // Минимальный правдоподобный TLS ClientHello: record 0x16 03 01,
+        // handshake type 0x01, random на offset 11..43, session_id_len=0x20 на data[43].
+        let mut data = vec![0u8; 517];
+        data[0] = TLS_RECORD_HANDSHAKE;
+        data[1] = 0x03; data[2] = 0x01;
+        let record_len = (data.len() - 5) as u16;
+        data[3] = (record_len >> 8) as u8;
+        data[4] = record_len as u8;
+        data[5] = 0x01; // ClientHello
+        // legacy_version
+        data[6] = 0x03; data[7] = 0x03;
+        // random уже нули
+        data[43] = 0x20; // session_id_len=32
+        for (i, b) in domain.as_bytes().iter().take(32).enumerate() {
+            data[44 + i] = *b;
+        }
+
+        let mut mac = HmacSha256::new_from_slice(&secret).unwrap();
+        mac.update(&data); // random обнулён
+        let expected = mac.finalize().into_bytes();
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as u32)
+            .unwrap_or(0);
+        let ts_bytes = ts.to_le_bytes();
+        for i in 0..28 {
+            data[CLIENT_RANDOM_OFFSET + i] = expected[i];
+        }
+        for i in 0..4 {
+            data[CLIENT_RANDOM_OFFSET + 28 + i] = ts_bytes[i] ^ expected[28 + i];
+        }
+        data
+    }
+
+    #[test]
+    fn verify_accepts_spec_ee_client_hello() {
+        let secret_hex = "0123456789abcdef0123456789abcdef";
+        let hello = build_ee_client_hello(secret_hex, "microsoft.com");
+        let secret = hex::decode(secret_hex).unwrap();
+        let res = verify_client_hello(&hello, &secret);
+        assert!(res.is_some(), "spec-compliant ee ClientHello должен проходить verify");
+    }
+
+    #[test]
+    fn verify_rejects_wrong_secret() {
+        let hello = build_ee_client_hello("0123456789abcdef0123456789abcdef", "microsoft.com");
+        let other = hex::decode("ffffffffffffffffffffffffffffffff").unwrap();
+        assert!(verify_client_hello(&hello, &other).is_none());
+    }
+}
+
 use crate::config::{log_debug, log_warn, STATS};
 use hmac::{Hmac, Mac};
 use rand::RngCore;

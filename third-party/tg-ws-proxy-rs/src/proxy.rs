@@ -48,7 +48,11 @@ pub fn resolve_configured_target(dc: i32, is_media: bool) -> Option<String> {
             return Some(t.clone());
         }
     }
-    None
+    // ФОРК (возврат семантики v1.2.3): при отсутствии пользовательских IP
+    // подставлять дефолтные IP DC, чтобы основной путь оставался прямым WS
+    // к датацентру. Апстрим (2026-09) убрал этот фолбэк, из-за чего при пустых
+    // настройках все соединения уходили в CF-fallback ("DC not in config").
+    DC_DEFAULT_IPS.get(&dc).map(|s| s.to_string())
 }
 
 pub fn resolve_fallback_target(dc: i32, _is_media: bool, is_test: bool) -> String {

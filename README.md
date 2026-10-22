@@ -64,7 +64,7 @@ Telegram → 127.0.0.1:1082 (MTProto) → движок на Rust → WSS (чер
 
 | Компонент | Версия |
 |---|---|
-| Приложение | `1.8.2-tg.2` (versionCode 1822) |
+| Приложение | `1.8.2-tg.3` (versionCode 1823) |
 | Kotlin | 2.2.0 |
 | Android Gradle Plugin | 8.11.0 |
 | Gradle | 8.14.3 |
