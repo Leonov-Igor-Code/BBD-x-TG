@@ -1,25 +1,25 @@
 <div align="center">
   
-# ByeByeDPI × TG
+# BBD x TG
 
 **Обход блокировок сайтов и прокси для Telegram — в одном приложении**
 
 <br>
 
-<a href="https://github.com/Leonov-Igor-Code/ByeByeDPI-x-tg/releases/latest">
-  <img src="https://img.shields.io/github/v/release/Leonov-Igor-Code/ByeByeDPI-x-tg?style=for-the-badge&logo=github&label=Release&color=0aa1dd" alt="Release">
+<a href="https://github.com/Leonov-Igor-Code/BBD-x-TG/releases/latest">
+  <img src="https://img.shields.io/github/v/release/Leonov-Igor-Code/BBD-x-TG?style=for-the-badge&logo=github&label=Release&color=0aa1dd" alt="Release">
 </a>
 <img src="https://img.shields.io/badge/Android-API_21%2B_target_34-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android SDK">
 <img src="https://img.shields.io/badge/Rust-Edition_2021-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust Version">
 <img src="https://img.shields.io/badge/Kotlin-2.2.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
-<a href="https://github.com/Leonov-Igor-Code/ByeByeDPI-x-tg/stargazers">
-  <img src="https://img.shields.io/github/stars/Leonov-Igor-Code/ByeByeDPI-x-tg?style=for-the-badge&logo=github&color=ffca28&labelColor=24292e" alt="Stars">
+<a href="https://github.com/Leonov-Igor-Code/BBD-x-TG/stargazers">
+  <img src="https://img.shields.io/github/stars/Leonov-Igor-Code/BBD-x-TG?style=for-the-badge&logo=github&color=ffca28&labelColor=24292e" alt="Stars">
 </a>
 
 </div>
 <br>
 
-**ByeByeDPI × TG** — это два инструмента под одной крышей: **обход блокировок сайтов** на ядре `byedpi` и локальный **MTProto-прокси для Telegram**, который перенаправляет трафик мессенджера через защищённые CloudFlare WebSocket-соединения. YouTube открывается, Telegram оживает — нажатием одной кнопки каждое.
+**BBD x TG** — независимый форк ByeByeDPI × TG (своё имя пакета `io.github.leonovigorcode.bbdxtg` и собственный ключ подписи — устанавливается рядом с оригиналом, не заменяя его). Два инструмента под одной крышей: **обход блокировок сайтов** на ядре `byedpi` и локальный **MTProto-прокси для Telegram**, который перенаправляет трафик мессенджера через защищённые CloudFlare WebSocket-соединения. YouTube открывается, Telegram оживает — нажатием одной кнопки каждое.
 
 <!-- Скриншот главного экрана: сделай скрин приложения и вставь сюда
 <img width="..." src="..." />
@@ -141,13 +141,13 @@ Rust-движок собирается отдельно и поставляет�
 
 <br>
 
-Каждый пуш собирается GitHub Actions ([вкладка Actions](https://github.com/Leonov-Igor-Code/ByeByeDPI-x-tg/actions)), пуш тега `v*` создаёт релиз, коммит с `[skip ci]` сборку пропускает.
+Каждый пуш собирается GitHub Actions ([вкладка Actions](https://github.com/Leonov-Igor-Code/BBD-x-TG/actions)), пуш тега `v*` создаёт релиз, коммит с `[skip ci]` сборку пропускает.
 
 Локально:
 
 ```bash
-git clone https://github.com/Leonov-Igor-Code/ByeByeDPI-x-tg.git
-cd ByeByeDPI-x-tg
+git clone https://github.com/Leonov-Igor-Code/BBD-x-TG.git
+cd BBD-x-TG
 git submodule update --init --recursive
 ./gradlew assembleDebug
 # APK: app/build/outputs/apk/debug/

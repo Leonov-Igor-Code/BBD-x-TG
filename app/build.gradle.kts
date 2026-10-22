@@ -13,7 +13,10 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.ewenloy.byedpixtg"
+        // Собственный ID форка: не конфликтует с апстримом и предыдущими
+        // сборками (io.github.romanvht.*, io.github.ewenloy.*) — ставится
+        // рядом с ними как независимое приложение.
+        applicationId = "io.github.leonovigorcode.bbdxtg"
         minSdk = 21
         //noinspection OldTargetApi
         targetSdk = 34
@@ -21,8 +24,8 @@ android {
         // romanvht/ByeByeDPI. versionCode наследует апстрим-кодировку
         // M*1000+m*100+p*10 (1.8.2 -> 1820) плюс форк-бамп в младшем
         // разряде; versionName — база апстрима + суффикс -tg.N.
-        versionCode = 1824
-        versionName = "1.8.2-tg.3"
+        versionCode = 1825
+        versionName = "1.8.2-tg.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -38,10 +41,12 @@ android {
 
     signingConfigs {
         create("release") {
+            // Собственный ключ форка (сгенерирован 2026-10-22, RSA 2048,
+            // validity 10950 дней), заменяет публичный ключ апстрима.
             storeFile = file("release.keystore")
-            storePassword = "byedpixtg"
-            keyAlias = "byedpixtg"
-            keyPassword = "byedpixtg"
+            storePassword = "unsktA_WFxDzyJIcX2EU"
+            keyAlias = "bbdxtg"
+            keyPassword = "unsktA_WFxDzyJIcX2EU"
         }
     }
 
@@ -99,6 +104,15 @@ android {
             reset()
             include(*abis.toTypedArray())
             isUniversalApk = true
+        }
+    }
+
+    // Понятные имена APK: BBD-x-TG_<версия>_<abi>.apk вместо app-<abi>-release.apk
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
+            output.outputFileName = "BBD-x-TG_${defaultConfig.versionName}_${abi}.apk"
         }
     }
 }
