@@ -205,9 +205,7 @@ fn server_hello_template() -> Vec<u8> {
     v.push(0x20);
     v.extend_from_slice(&[0u8; 32]);
     v.extend_from_slice(&[0x13, 0x01, 0x00]);
-    // ФОРК: фикс портирования — в оригинале Flowseal здесь ровно 2 байта
-    // (\x00\x2e), лишний 0x00 раздувал шаблон до 128 байт при record-длине
-    // 0x7a=122 и сдвигал все поля — клиент отвергал ServerHello.
+    // ФОРК: ровно 2 байта, как в оригинале Flowseal (\x00\x2e) — лишний 0x00 ломал длину записи и клиент отвергал ServerHello.
     v.extend_from_slice(&[0x00, 0x2e]);
     v.extend_from_slice(&[0x00, 0x33, 0x00, 0x24, 0x00, 0x1d, 0x00, 0x20]);
     v.extend_from_slice(&[0u8; 32]);
