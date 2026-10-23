@@ -9,4 +9,6 @@ data class TestSettings(
     val requestsCount: Int,
     val requestTimeout: Long,
     val requestLimit: Int,
+    // Активные списки доменов — снимок для группировки результатов прогона
+    val domainLists: List<DomainList> = emptyList(),
 )

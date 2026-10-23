@@ -13,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.github.romanvht.byedpi.R
+import io.github.romanvht.byedpi.data.DomainList
 import io.github.romanvht.byedpi.data.StrategyResult
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -25,6 +26,8 @@ class StrategyResultAdapter(
 
     private var isTesting = false
     private val strategies = mutableListOf<StrategyResult>()
+    // Снимок активных списков прогона: передаётся в SiteResultAdapter
+    private var domainGroups: List<DomainList> = emptyList()
 
     class StrategyViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val commandTextView: TextView = view.findViewById(R.id.commandTextView)
@@ -92,10 +95,10 @@ class StrategyResultAdapter(
                 holder.expandIcon.rotation = 180f
                 holder.sitesRecyclerView.visibility = View.VISIBLE
 
-                val siteAdapter = SiteResultAdapter()
+                val siteAdapter = SiteResultAdapter(context.getString(R.string.test_no_list))
                 holder.sitesRecyclerView.layoutManager = LinearLayoutManager(context)
                 holder.sitesRecyclerView.adapter = siteAdapter
-                siteAdapter.updateSites(strategy.siteResults)
+                siteAdapter.updateSites(strategy.siteResults, domainGroups)
             } else {
                 holder.expandTextView.text = context.getString(R.string.test_show_details)
                 holder.expandIcon.rotation = 0f
@@ -138,7 +141,7 @@ class StrategyResultAdapter(
             if (strategy.isExpanded && holder.sitesRecyclerView.isVisible) {
                 val adapter = holder.sitesRecyclerView.adapter
                 if (adapter is SiteResultAdapter) {
-                    adapter.updateSites(strategy.siteResults)
+                    adapter.updateSites(strategy.siteResults, domainGroups)
                 }
             }
         }
@@ -146,6 +149,13 @@ class StrategyResultAdapter(
 
     override fun getItemCount(): Int {
         return strategies.size
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateGroups(groups: List<DomainList>) {
+        if (domainGroups == groups) return
+        domainGroups = groups
+        notifyDataSetChanged()
     }
 
     fun updateStrategy(strategy: StrategyResult) {

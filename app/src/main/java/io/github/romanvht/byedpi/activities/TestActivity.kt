@@ -21,9 +21,11 @@ import com.google.android.material.button.MaterialButton
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.adapters.StrategyResultAdapter
 import io.github.romanvht.byedpi.data.AppStatus
+import io.github.romanvht.byedpi.data.DomainList
 import io.github.romanvht.byedpi.data.Mode
 import io.github.romanvht.byedpi.data.StrategyResult
 import io.github.romanvht.byedpi.data.TestState
+import io.github.romanvht.byedpi.data.buildSiteGroups
 import io.github.romanvht.byedpi.services.ServiceManager
 import io.github.romanvht.byedpi.services.TestService
 import io.github.romanvht.byedpi.services.appStatus
@@ -45,6 +47,8 @@ class TestActivity : BaseActivity() {
     private lateinit var cmdHistoryUtils: HistoryUtils
 
     private val strategies = mutableListOf<StrategyResult>()
+    // Снимок групп прогона — для карточек и copyLog
+    private var domainGroups: List<DomainList> = emptyList()
     private var renderedRunId = -1L
     private val isTesting: Boolean get() = TestService.isRunning
     private val prefs by lazy { getPreferences() }
@@ -166,6 +170,10 @@ class TestActivity : BaseActivity() {
         disclaimerTextView.text = getString(if (state.wasInterrupted) R.string.test_crash else R.string.test_disclaimer)
 
         strategyAdapter.setTestingState(state.isRunning)
+        if (domainGroups != state.domainGroups) {
+            domainGroups = state.domainGroups
+            strategyAdapter.updateGroups(state.domainGroups)
+        }
         val replace = renderedRunId != state.runId || strategies.map { it.command } != state.strategies.map { it.command }
         val reorder = replace || strategies.indices.any { strategies[it].isCompleted != state.strategies[it].isCompleted }
         if (replace) {
@@ -227,8 +235,18 @@ class TestActivity : BaseActivity() {
         completeStrategies.forEach { strategy ->
             sb.appendLine("${strategy.command}\n")
 
-            strategy.siteResults.forEach { site ->
-                sb.appendLine("${site.site} - ${site.successCount}/${site.totalCount}")
+            if (domainGroups.isNotEmpty()) {
+                buildSiteGroups(strategy.siteResults, domainGroups, getString(R.string.test_no_list)).forEach { group ->
+                    sb.appendLine("[${group.name}]")
+                    group.siteResults.forEach { site ->
+                        sb.appendLine("${site.site} - ${site.successCount}/${site.totalCount}")
+                    }
+                    sb.appendLine("${group.name}: ${group.successCount}/${group.totalCount} (${group.successPercentage}%)")
+                }
+            } else {
+                strategy.siteResults.forEach { site ->
+                    sb.appendLine("${site.site} - ${site.successCount}/${site.totalCount}")
+                }
             }
 
             sb.appendLine("\n${strategy.successCount}/${strategy.totalRequests}")
