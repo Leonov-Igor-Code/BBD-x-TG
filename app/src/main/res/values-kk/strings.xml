@@ -158,6 +158,12 @@
     <string name="test_show_details">Мәліметтерді көрсету</string>
     <string name="test_hide_details">Мәліметтерді жасыру</string>
     <string name="test_expand">Кеңейту</string>
+    <string name="test_no_list">Тізімсіз</string>
+    <string name="test_extended_button">Кеңейтілген іріктеу</string>
+    <string name="test_extended_title">Стратегияларды кеңейтілген іріктеу</string>
+    <string name="test_extended_message">Тексерілген стратегия тұрпаттары негізінде құрылған параметр нұсқаларын тексеру. Қарапайым іріктеуге қарағанда едәуір көп уақыт пен трафик жұмсап, батареяны тезитетеді. Wi-Fi және кемінде 50% заряд ұсынылады.</string>
+    <string name="test_extended_preset_medium">Орташа (~75 стратегия, ~8–15 мин)</string>
+    <string name="test_extended_preset_full">Толық (~200 стратегия, ~20–40 мин)</string>
     <string name="battery_optimization">Батареяны оңтайландыру</string>
     <string name="battery_optimization_summary">Тұрақтылықты жақсарту үшін қосыңыз</string>
     <string name="battery_optimization_disabled_summary">Ажыратылған</string>

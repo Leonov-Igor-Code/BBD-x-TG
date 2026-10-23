@@ -54,7 +54,12 @@ class TestService : Service() {
         val isRunning: Boolean
             get() = state.value.isRunning
 
-        fun start(context: Context) {
+        /**
+         * Запуск прогона стратегий. [extendedMode]: 0 — обычный список
+         * (файл/пользовательские команды), иначе пресет расширенного подбора
+         * из [StrategyVariantsUtils] — команды генерируются динамически.
+         */
+        fun start(context: Context, extendedMode: Int = 0) {
             if (isRunning) return
             ServiceManager.refresh(context)
             val previous = state.value
@@ -65,6 +70,7 @@ class TestService : Service() {
                 currentStrategy = 0,
                 failed = false,
                 wasInterrupted = false,
+                extendedMode = extendedMode,
             )
             try {
                 ContextCompat.startForegroundService(context, Intent(context, TestService::class.java).setAction(START_ACTION))
@@ -117,10 +123,14 @@ class TestService : Service() {
                 } catch (_: Exception) {
                     emptyList()
                 }
+                // Снимок активных списков для группировки загруженных результатов
+                DomainListUtils.syncLists(app)
+                val domainGroups = DomainListUtils.getLists(app).filter { it.isActive }
                 previous.copy(
                     isLoaded = true,
                     strategies = results,
                     wasInterrupted = app.getPreferences().getBoolean("is_test_running", false),
+                    domainGroups = domainGroups,
                 )
             }
             withContext(Dispatchers.Main.immediate) {
@@ -239,6 +249,9 @@ class TestService : Service() {
                 }
                 strategies.addAll(options.commands.map { StrategyResult(command = it) })
                 prepared = true
+                // Снимок активных списков прогона: фиксируется до первого publish,
+                // позднейшие правки списков не искажают группировку результатов
+                mutableState.value = state.value.copy(domainGroups = options.domainLists)
                 getPreferences().edit(commit = true) { putBoolean("is_test_running", true) }
                 publish(strategies, 0)
                 ServiceManager.waitStop()
@@ -297,6 +310,8 @@ class TestService : Service() {
                         runId = previous.runId,
                         isLoaded = true,
                         strategies = snapshot(strategies),
+                        domainGroups = state.value.domainGroups,
+                        extendedMode = state.value.extendedMode,
                         failed = failed,
                     ) else previous.copy(failed = failed)
                 }
@@ -388,8 +403,12 @@ class TestService : Service() {
         val prefs = getPreferences()
         val userCommands = prefs.getBoolean("byedpi_proxytest_usercommands", false)
         val sniValue = prefs.getStringNotNull("byedpi_proxytest_sni", "google.com")
-        val content = if (userCommands) prefs.getStringNotNull("byedpi_proxytest_commands", "")
-        else assets.open("proxytest_strategies.list").bufferedReader().use { it.readText() }
+        val content = when {
+            state.value.extendedMode != 0 ->
+                StrategyVariantsUtils.generate(sniValue, state.value.extendedMode).joinToString("\n")
+            userCommands -> prefs.getStringNotNull("byedpi_proxytest_commands", "")
+            else -> assets.open("proxytest_strategies.list").bufferedReader().use { it.readText() }
+        }
         val commands = content.replace("{sni}", "\"${sniValue}\"").lines().map { it.trim() }.filter { it.isNotEmpty() }
         val host = prefs.getStringNotNull("byedpi_proxy_ip", "127.0.0.1")
         val port = prefs.getIntStringNotNull("byedpi_proxy_port", 1080)
@@ -398,8 +417,17 @@ class TestService : Service() {
         val requestTimeout = prefs.getLongStringNotNull("byedpi_proxytest_timeout", 5).coerceAtLeast(1)
         val requestLimit = prefs.getIntStringNotNull("byedpi_proxytest_limit", 20).coerceAtLeast(1)
         DomainListUtils.syncLists(this)
-        return TestSettings(DomainListUtils.getActiveDomains(this).toList(), commands, host, port,
-            delaySec, requestsCount, requestTimeout, requestLimit)
+        return TestSettings(
+            sites = DomainListUtils.getActiveDomains(this).toList(),
+            commands = commands,
+            host = host,
+            port = port,
+            delaySec = delaySec,
+            requestsCount = requestsCount,
+            requestTimeout = requestTimeout,
+            requestLimit = requestLimit,
+            domainLists = DomainListUtils.getLists(this).filter { it.isActive },
+        )
     }
 
     private fun resetStrategyResult(strategy: StrategyResult, settings: TestSettings) {

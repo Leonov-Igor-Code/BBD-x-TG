@@ -17,17 +17,21 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.button.MaterialButton
 import io.github.romanvht.byedpi.R
 import io.github.romanvht.byedpi.adapters.StrategyResultAdapter
 import io.github.romanvht.byedpi.data.AppStatus
+import io.github.romanvht.byedpi.data.DomainList
 import io.github.romanvht.byedpi.data.Mode
 import io.github.romanvht.byedpi.data.StrategyResult
 import io.github.romanvht.byedpi.data.TestState
+import io.github.romanvht.byedpi.data.buildSiteGroups
 import io.github.romanvht.byedpi.services.ServiceManager
 import io.github.romanvht.byedpi.services.TestService
 import io.github.romanvht.byedpi.services.appStatus
 import io.github.romanvht.byedpi.utility.HistoryUtils
+import io.github.romanvht.byedpi.utility.StrategyVariantsUtils
 import io.github.romanvht.byedpi.utility.getPreferences
 import io.github.romanvht.byedpi.utility.mode
 import kotlinx.coroutines.Dispatchers
@@ -42,9 +46,12 @@ class TestActivity : BaseActivity() {
     private lateinit var startStopButton: MaterialButton
     private lateinit var checkTgWsButton: MaterialButton
     private lateinit var strategyAdapter: StrategyResultAdapter
+    private lateinit var extendedButton: MaterialButton
     private lateinit var cmdHistoryUtils: HistoryUtils
 
     private val strategies = mutableListOf<StrategyResult>()
+    // Снимок групп прогона — для карточек и copyLog
+    private var domainGroups: List<DomainList> = emptyList()
     private var renderedRunId = -1L
     private val isTesting: Boolean get() = TestService.isRunning
     private val prefs by lazy { getPreferences() }
@@ -59,6 +66,7 @@ class TestActivity : BaseActivity() {
         strategiesRecyclerView = findViewById(R.id.strategiesRecyclerView)
         startStopButton = findViewById(R.id.startStopButton)
         checkTgWsButton = findViewById(R.id.checkTgWsButton)
+        extendedButton = findViewById(R.id.extendedButton)
         progressTextView = findViewById(R.id.progressTextView)
         disclaimerTextView = findViewById(R.id.disclaimerTextView)
 
@@ -93,6 +101,12 @@ class TestActivity : BaseActivity() {
         // при выходе с экрана; отчёт приходит через TestState.tgWsReport
         checkTgWsButton.setOnClickListener {
             if (!isTesting) TestService.startTgWsCheck(this)
+        }
+
+        // Расширенный подбор: прогон сгенерированных параметрических вариаций
+        // вместо статичного списка. Перед запуском — предупреждение и пресет.
+        extendedButton.setOnClickListener {
+            if (!isTesting && TestService.state.value.isTgWsChecking.not()) showExtendedDialog()
         }
 
         startStopButton.setOnFocusChangeListener { _, hasFocus ->
@@ -153,6 +167,7 @@ class TestActivity : BaseActivity() {
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         checkTgWsButton.isEnabled = !state.isRunning && !state.isTgWsChecking
+        extendedButton.isEnabled = !state.isRunning && !state.isTgWsChecking
         progressTextView.text = when {
             state.isRunning && state.currentStrategy > 0 -> getString(R.string.test_process, state.currentStrategy, state.strategies.size)
             state.isRunning -> ""
@@ -166,6 +181,10 @@ class TestActivity : BaseActivity() {
         disclaimerTextView.text = getString(if (state.wasInterrupted) R.string.test_crash else R.string.test_disclaimer)
 
         strategyAdapter.setTestingState(state.isRunning)
+        if (domainGroups != state.domainGroups) {
+            domainGroups = state.domainGroups
+            strategyAdapter.updateGroups(state.domainGroups)
+        }
         val replace = renderedRunId != state.runId || strategies.map { it.command } != state.strategies.map { it.command }
         val reorder = replace || strategies.indices.any { strategies[it].isCompleted != state.strategies[it].isCompleted }
         if (replace) {
@@ -214,6 +233,26 @@ class TestActivity : BaseActivity() {
         }
     }
 
+    private fun showExtendedDialog() {
+        var preset = StrategyVariantsUtils.PRESET_MEDIUM
+        val presets = arrayOf(
+            getString(R.string.test_extended_preset_medium),
+            getString(R.string.test_extended_preset_full),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.test_extended_title))
+            .setMessage(getString(R.string.test_extended_message))
+            .setSingleChoiceItems(presets, 0) { _, which ->
+                preset = if (which == 1) StrategyVariantsUtils.PRESET_FULL else StrategyVariantsUtils.PRESET_MEDIUM
+            }
+            .setPositiveButton(R.string.test_start) { dialog, _ ->
+                dialog.dismiss()
+                TestService.start(this, preset)
+            }
+            .setNegativeButton(android.R.string.cancel) { dialog, _ -> dialog.dismiss() }
+            .show()
+    }
+
     private fun copyLog() {
         val completeStrategies = strategies.filter { it.isCompleted }
 
@@ -227,8 +266,18 @@ class TestActivity : BaseActivity() {
         completeStrategies.forEach { strategy ->
             sb.appendLine("${strategy.command}\n")
 
-            strategy.siteResults.forEach { site ->
-                sb.appendLine("${site.site} - ${site.successCount}/${site.totalCount}")
+            if (domainGroups.isNotEmpty()) {
+                buildSiteGroups(strategy.siteResults, domainGroups, getString(R.string.test_no_list)).forEach { group ->
+                    sb.appendLine("[${group.name}]")
+                    group.siteResults.forEach { site ->
+                        sb.appendLine("${site.site} - ${site.successCount}/${site.totalCount}")
+                    }
+                    sb.appendLine("${group.name}: ${group.successCount}/${group.totalCount} (${group.successPercentage}%)")
+                }
+            } else {
+                strategy.siteResults.forEach { site ->
+                    sb.appendLine("${site.site} - ${site.successCount}/${site.totalCount}")
+                }
             }
 
             sb.appendLine("\n${strategy.successCount}/${strategy.totalRequests}")

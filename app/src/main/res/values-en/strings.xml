@@ -158,6 +158,12 @@
     <string name="test_show_details">Show details</string>
     <string name="test_hide_details">Hide details</string>
     <string name="test_expand">Expand</string>
+    <string name="test_no_list">No list</string>
+    <string name="test_extended_button">Extended search</string>
+    <string name="test_extended_title">Extended strategy search</string>
+    <string name="test_extended_message">Runs generated parameter variations around proven strategy families. Takes considerably more time and traffic than regular search and drains the battery. Wi-Fi and a charge level of at least 50% are recommended.</string>
+    <string name="test_extended_preset_medium">Medium (~75 strategies, ~8–15 min)</string>
+    <string name="test_extended_preset_full">Full (~200 strategies, ~20–40 min)</string>
     <string name="battery_optimization">Battery optimization</string>
     <string name="battery_optimization_summary">Turn off to improve stability</string>
     <string name="battery_optimization_disabled_summary">Disabled</string>

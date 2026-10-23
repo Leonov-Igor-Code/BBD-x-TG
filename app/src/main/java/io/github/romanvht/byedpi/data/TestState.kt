@@ -12,4 +12,11 @@ data class TestState(
     // Фоновая диагностика TG WS (форк): не блокирует тест стратегий
     val isTgWsChecking: Boolean = false,
     val tgWsReport: String = "",
+    // Снимок активных списков доменов на момент старта прогона / загрузки
+    // результатов: для группировки сайтов в карточках и логе. Gson'ом не
+    // сериализуется (в proxy_test_results.json хранятся только StrategyResult).
+    val domainGroups: List<DomainList> = emptyList(),
+    // Режим расширенного подбора: 0 — обычный прогон,
+    // иначе пресет StrategyVariantsUtils (PRESET_MEDIUM / PRESET_FULL)
+    val extendedMode: Int = 0,
 )

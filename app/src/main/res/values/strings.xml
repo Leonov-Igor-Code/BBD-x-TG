@@ -173,6 +173,12 @@
     <string name="test_show_details">Показать детали</string>
     <string name="test_hide_details">Скрыть детали</string>
     <string name="test_expand">Развернуть</string>
+    <string name="test_no_list">Без списка</string>
+    <string name="test_extended_button">Расширенный подбор</string>
+    <string name="test_extended_title">Расширенный подбор стратегий</string>
+    <string name="test_extended_message">Прогон сгенерированных вариаций параметров вокруг проверенных семейств стратегий. Занимает заметно больше времени и трафика, чем обычный подбор, и расходует батарею. Рекомендуются Wi-Fi и уровень заряда не ниже 50%.</string>
+    <string name="test_extended_preset_medium">Умеренный (~75 стратегий, ~8–15 мин)</string>
+    <string name="test_extended_preset_full">Полный (~200 стратегий, ~20–40 мин)</string>
     <string name="battery_optimization">Оптимизация батареи</string>
     <string name="battery_optimization_summary">Отключите для улучшения стабильности</string>
     <string name="battery_optimization_disabled_summary">Отключена</string>
