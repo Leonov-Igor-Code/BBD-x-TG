@@ -159,6 +159,11 @@
     <string name="test_hide_details">Detayları gizle</string>
     <string name="test_expand">Genişlet</string>
     <string name="test_no_list">Liste dışı</string>
+    <string name="test_extended_button">Genişletilmiş seçim</string>
+    <string name="test_extended_title">Genişletilmiş strateji seçimi</string>
+    <string name="test_extended_message">Kanıtlanmış strateji aileleri etrafında üretilen parametre varyasyonlarını çalıştırır. Normal seçime göre belirgin şekilde daha fazla zaman ve veri harcar, pili tüketir. Wi-Fi ve en az %50 şarj önerilir.</string>
+    <string name="test_extended_preset_medium">Orta (~75 strateji, ~8–15 dk)</string>
+    <string name="test_extended_preset_full">Tam (~200 strateji, ~20–40 dk)</string>
     <string name="battery_optimization">Pil optimizasyonu</string>
     <string name="battery_optimization_summary">Kararlılığı artırmak için etkinleştirin</string>
     <string name="battery_optimization_disabled_summary">Devre dışı bırakıldı</string>

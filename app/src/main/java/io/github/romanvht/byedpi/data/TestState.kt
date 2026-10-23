@@ -16,4 +16,7 @@ data class TestState(
     // результатов: для группировки сайтов в карточках и логе. Gson'ом не
     // сериализуется (в proxy_test_results.json хранятся только StrategyResult).
     val domainGroups: List<DomainList> = emptyList(),
+    // Режим расширенного подбора: 0 — обычный прогон,
+    // иначе пресет StrategyVariantsUtils (PRESET_MEDIUM / PRESET_FULL)
+    val extendedMode: Int = 0,
 )
